@@ -1,13 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "llm-fine-tune"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tools to build the leetcode-solutions HuggingFace dataset"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "polars>=1.0.0",
+]
+
+[project.scripts]
+build-dataset = "llm_fine_tune.build_dataset:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_fine_tune"]
 
 [dependency-groups]
 dev = [
     "ruff>=0.1.0",
     "commitizen>=3.0.0",
+    "ipykernel>=7.2.0",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
 ]
