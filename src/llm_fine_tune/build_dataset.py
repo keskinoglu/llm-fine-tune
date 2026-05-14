@@ -27,6 +27,7 @@ PROBLEM_FOLDER_PATTERN = re.compile(r"^(\d+)\. (.+)$")
 
 
 def _ensure_source_repo() -> None:
+    """Clone the source repo if it doesn't already exist locally."""
     if SOURCE_REPO_DIR.exists():
         print(f"Using existing clone at {SOURCE_REPO_DIR}")
         return
@@ -38,12 +39,14 @@ def _ensure_source_repo() -> None:
 
 
 def _update_source_repo() -> None:
+    """Ensure the source repo exists, then pull the latest changes."""
     _ensure_source_repo()
     print(f"Pulling latest changes in {SOURCE_REPO_DIR} ...")
     subprocess.run(["git", "-C", str(SOURCE_REPO_DIR), "pull"], check=True)
 
 
 def _parse_problem_folder(folder_name: str) -> tuple[int, str] | None:
+    """Parse a folder name like '1. Two Sum' into (1, 'Two Sum'). Returns None if it doesn't match."""
     match = PROBLEM_FOLDER_PATTERN.match(folder_name)
     if not match:
         return None
@@ -51,11 +54,13 @@ def _parse_problem_folder(folder_name: str) -> tuple[int, str] | None:
 
 
 def _read_solution_file(folder: Path, problem_id: int, extension: str) -> str | None:
+    """Read a solution file for the given problem and extension. Returns None if absent."""
     path = folder / f"{problem_id}.{extension}"
     return path.read_text(encoding="utf-8") if path.exists() else None
 
 
 def _build_problem_row(folder: Path, problem_id: int, title: str) -> dict:
+    """Build a single dataset row with metadata and all available language solutions."""
     row: dict = {"problem_id": problem_id, "title": title}
     for extension, column in EXTENSION_TO_COLUMN.items():
         row[column] = _read_solution_file(folder, problem_id, extension)
@@ -63,6 +68,7 @@ def _build_problem_row(folder: Path, problem_id: int, title: str) -> dict:
 
 
 def _collect_problem_rows() -> list[dict]:
+    """Walk the solutions directory and collect one row per problem."""
     rows = []
     for folder in sorted(SOLUTIONS_DIR.iterdir()):
         if not folder.is_dir():
@@ -77,6 +83,7 @@ def _collect_problem_rows() -> list[dict]:
 
 
 def _build_dataframe(rows: list[dict]) -> pl.DataFrame:
+    """Convert collected rows into a typed, sorted Polars DataFrame."""
     schema = {
         "problem_id": pl.Int64,
         "title": pl.Utf8,
@@ -86,11 +93,13 @@ def _build_dataframe(rows: list[dict]) -> pl.DataFrame:
 
 
 def _save_parquet(df: pl.DataFrame) -> None:
+    """Write the DataFrame to OUTPUT_PATH as a zstd-compressed Parquet file."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     df.write_parquet(OUTPUT_PATH, compression="zstd")
 
 
 def _print_summary(df: pl.DataFrame) -> None:
+    """Print row count and per-language solution coverage to stdout."""
     print(f"\nSaved {df.height:,} problems to {OUTPUT_PATH}")
     for col in LANGUAGE_COLUMNS:
         count = df[col].is_not_null().sum()
@@ -98,6 +107,7 @@ def _print_summary(df: pl.DataFrame) -> None:
 
 
 def main() -> None:
+    """Entry point. Clones or updates the source repo, builds the dataset, and saves it."""
     parser = argparse.ArgumentParser(
         description="Build the leetcode-solutions Parquet dataset."
     )

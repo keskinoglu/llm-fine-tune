@@ -13,6 +13,7 @@ DEFAULT_COMMIT_MESSAGE = "Update dataset"
 
 
 def _ensure_files_exist() -> None:
+    """Raise FileNotFoundError with actionable messages if required files are missing."""
     if not PARQUET_PATH.exists():
         raise FileNotFoundError(f"{PARQUET_PATH} not found — run `make dataset` first.")
     if not DATASET_CARD_PATH.exists():
@@ -20,6 +21,7 @@ def _ensure_files_exist() -> None:
 
 
 def _build_commit_operations() -> list[CommitOperationAdd]:
+    """Return the HF commit operations for the dataset card and Parquet file."""
     return [
         CommitOperationAdd(
             path_in_repo="README.md", path_or_fileobj=str(DATASET_CARD_PATH)
@@ -33,6 +35,7 @@ def _build_commit_operations() -> list[CommitOperationAdd]:
 def _commit_to_hub(
     api: HfApi, operations: list[CommitOperationAdd], message: str
 ) -> None:
+    """Push all operations as a single atomic commit to the HF dataset repo."""
     print(f"Uploading {len(operations)} files to {REPO_ID} ...")
     api.create_commit(
         repo_id=REPO_ID,
@@ -43,6 +46,7 @@ def _commit_to_hub(
 
 
 def main() -> None:
+    """Entry point. Validates local files, then uploads them to HuggingFace via Xet."""
     parser = argparse.ArgumentParser(
         description="Upload the leetcode-solutions dataset to HuggingFace."
     )
