@@ -1,4 +1,7 @@
-.PHONY: help lint lf commit cz bump dataset clean-data
+-include .env
+export
+
+.PHONY: help lint lf commit cz bump dataset clean-data upload publish
 
 help:
 	@echo "Available commands:"
@@ -9,6 +12,8 @@ help:
 	@echo "  make bump        Bump the project version using commitizen"
 	@echo "  make dataset     Clone walkccc/LeetCode (if needed) and build the Parquet dataset"
 	@echo "  make clean-data  Remove the cloned source repo and generated output"
+	@echo "  make upload      Upload existing Parquet + dataset card to HuggingFace"
+	@echo "  make publish     Build the dataset, then upload it (dataset + upload)"
 
 lint:
 	uv run ruff check .
@@ -31,3 +36,8 @@ dataset:
 
 clean-data:
 	rm -rf data/ output/
+
+upload:
+	uv run python -m llm_fine_tune.upload_dataset
+
+publish: dataset upload

@@ -10,10 +10,12 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "polars>=1.0.0",
+    "huggingface-hub>=0.32.0",
 ]
 
 [project.scripts]
 build-dataset = "llm_fine_tune.build_dataset:main"
+publish-dataset = "llm_fine_tune.upload_dataset:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_fine_tune"]
