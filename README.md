@@ -52,16 +52,16 @@ uv sync
 
 ## Building the datasets
 
-Build the `base` dataset (clones `walkccc/LeetCode` on first run):
-
-```bash
-make base
-```
-
 Pass `--pull` to fetch the latest changes before building:
 
 ```bash
 uv run python -m llm_fine_tune.build_base_dataset --pull
+```
+
+Build the `base` dataset (clones `walkccc/LeetCode` on first run):
+
+```bash
+make base
 ```
 
 Build the `instruct` dataset from the `base` parquet:
