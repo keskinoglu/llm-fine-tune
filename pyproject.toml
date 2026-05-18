@@ -14,7 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-build-dataset = "llm_fine_tune.build_dataset:main"
+build-base-dataset = "llm_fine_tune.build_base_dataset:main"
+build-instruct-dataset = "llm_fine_tune.build_instruct_dataset:main"
 publish-dataset = "llm_fine_tune.upload_dataset:main"
 
 [tool.hatch.build.targets.wheel]
