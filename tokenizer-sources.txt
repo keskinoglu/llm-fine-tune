@@ -1,0 +1,17 @@
+# Each line: <display-name>=<huggingface-model-id>
+# Only the tokenizer is loaded — model weights are never downloaded.
+# Lines starting with '#' and blank lines are ignored.
+
+Aya-101=CohereForAI/aya-101
+gemma-4=google/gemma-4-E2B-it
+gpt-oss-120b=openai/gpt-oss-120b
+
+qwen2.5-coder-7b=Qwen/Qwen2.5-Coder-7B-Instruct
+# qwen3-coder-next: requires a different tokenizer loader (GGUF-based)
+# qwen3-coder-next=Qwen/Qwen3-Coder-Next
+qwen3-coder-30b=Qwen/Qwen3-Coder-30B-A3B-Instruct
+
+deepseek-coder-v2=deepseek-ai/DeepSeek-Coder-V2-Instruct
+codestral-22b=mistralai/Codestral-22B-v0.1
+
+llama-3.2-3b=meta-llama/Llama-3.2-3B-Instruct  # gated
