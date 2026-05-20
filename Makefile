@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: help lint lf commit cz bump base instruct dataset clean-data upload publish
+.PHONY: help lint lf commit cz bump base instruct dataset clean-data upload publish fertility
 
 help:
 	@echo "Available commands:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make clean-data Remove the cloned source repo and generated output"
 	@echo "  make upload   Upload existing Parquet files + dataset card to HuggingFace"
 	@echo "  make publish  Build both datasets, then upload them (dataset + upload)"
+	@echo "  make fertility  Compute tokenizer fertility for sources in tokenizer-sources.txt"
 
 lint:
 	uv run ruff check .
@@ -48,3 +49,6 @@ upload:
 	uv run python -m llm_fine_tune.upload_dataset
 
 publish: dataset upload
+
+fertility:
+	uv run python -m llm_fine_tune.analyze_tokenizer_fertility
