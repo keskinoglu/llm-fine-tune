@@ -1,6 +1,12 @@
 # llm-fine-tune
 
-Tools to build and publish the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset from the [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) repository.
+Fine-tune an open LLM to translate code between **C++**, **Java**, and **Python**.
+
+The project is organized as a pipeline of three stages:
+
+1. **Build the dataset** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish them as the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
+2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
+3. **Fine-tune** — *(not yet implemented)* Fine-tune the chosen base model on the `instruct` configuration to specialize it for C++/Java/Python translation.
 
 The dataset has two configurations:
 
@@ -50,7 +56,7 @@ Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
 uv sync
 ```
 
-## Building the datasets
+## Stage 1: Build the dataset
 
 Pass `--pull` to fetch the latest changes before building:
 
@@ -83,7 +89,7 @@ make clean-data
 make dataset
 ```
 
-## Uploading to HuggingFace
+### Publishing to HuggingFace
 
 Authentication is required. Set your HF token once:
 
@@ -117,7 +123,9 @@ uv run python -m llm_fine_tune.upload_dataset --message "Add instruct config"
 
 Uploads use HuggingFace's [Xet storage backend](https://huggingface.co/docs/hub/xet/using-xet-storage) automatically via `huggingface-hub>=0.32.0`.
 
-## Evaluating tokenizer fertility
+## Stage 2: Pick a base model
+
+Before fine-tuning, compare how efficiently candidate HuggingFace models tokenize the dataset. A tokenizer that produces fewer tokens per unit of code means lower fine-tuning and inference cost on the same training budget.
 
 Tokenizer fertility measures how efficiently a tokenizer encodes text. Lower `tokens_per_word` and higher `bytes_per_token` mean better compression — especially important for code-heavy datasets.
 
@@ -177,6 +185,10 @@ Use a custom tokenizer sources file:
 ```bash
 uv run python -m llm_fine_tune.analyze_tokenizer_fertility -s my-tokenizers.txt
 ```
+
+## Stage 3: Fine-tune
+
+*Not yet implemented.* The next stage will fine-tune the base model chosen in Stage 2 on the `instruct` configuration to specialize it for C++/Java/Python translation.
 
 ## Available commands
 
