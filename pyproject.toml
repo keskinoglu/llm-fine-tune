@@ -32,4 +32,7 @@ dev = [
     "ipykernel>=7.2.0",
     "pandas>=3.0.3",
     "pyarrow>=24.0.0",
+    "matplotlib>=3.10.9",
+    "transformers>=5.8.1",
+    "datasets>=4.8.5",
 ]
