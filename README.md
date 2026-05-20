@@ -117,6 +117,67 @@ uv run python -m llm_fine_tune.upload_dataset --message "Add instruct config"
 
 Uploads use HuggingFace's [Xet storage backend](https://huggingface.co/docs/hub/xet/using-xet-storage) automatically via `huggingface-hub>=0.32.0`.
 
+## Evaluating tokenizer fertility
+
+Tokenizer fertility measures how efficiently a tokenizer encodes text. Lower `tokens_per_word` and higher `bytes_per_token` mean better compression — especially important for code-heavy datasets.
+
+Run the evaluation against `output/leetcode-instruct.parquet` (build it first with `make instruct`):
+
+```bash
+make fertility
+```
+
+The script loads only the tokenizer from each model — weights are never downloaded. Results are printed to stdout and saved to `output/tokenizer-fertility-report.parquet`.
+
+Three metrics are reported per tokenizer:
+
+| Metric | What it measures | Better when |
+|---|---|---|
+| `tokens_per_word` | Tokens per word in the code | Lower |
+| `chars_per_token` | Characters compressed per token | Higher |
+| `bytes_per_token` | UTF-8 bytes per token (compression ratio) | Higher |
+
+Typical ranges for code: `tokens_per_word` ~1.5–5, `bytes_per_token` ~2.5–4.
+
+**How "word" is defined:** words are extracted with the regex `\w+` (`[a-zA-Z0-9_]`), which splits on punctuation, operators, and whitespace. This is language-agnostic — it works identically for Python, Java, C++, SQL, etc. The key coding implication is that `_` is included, so `snake_case` identifiers count as **one** word, which matches how developers read them. `camelCase` also counts as one word (no sub-word splitting). Numbers count as words too.
+
+```
+for(int i = 0; i < n; i++)   →  for  int  i  0  i  n  i   (7 words)
+def calculate_total(items):   →  def  calculate_total  items  (3 words)
+```
+
+### Configuring which tokenizers to evaluate
+
+Edit `tokenizer-sources.txt` at the project root. Each line maps a display name to a HuggingFace model ID:
+
+```
+# Each line: <display-name>=<huggingface-model-id>
+# Only the tokenizer is loaded — model weights are never downloaded.
+# Lines starting with '#' and blank lines are ignored.
+qwen2.5-coder-7b=Qwen/Qwen2.5-Coder-7B-Instruct
+codestral-22b=mistralai/Codestral-22B-v0.1
+```
+
+To evaluate against a remote HuggingFace dataset instead of the local parquet:
+
+```bash
+uv run python -m llm_fine_tune.analyze_tokenizer_fertility \
+  --hf-dataset tkeskin/leetcode-solutions \
+  --hf-config instruct
+```
+
+For a quick smoke test on a subset:
+
+```bash
+uv run python -m llm_fine_tune.analyze_tokenizer_fertility --limit 100
+```
+
+Use a custom tokenizer sources file:
+
+```bash
+uv run python -m llm_fine_tune.analyze_tokenizer_fertility -s my-tokenizers.txt
+```
+
 ## Available commands
 
 ```
@@ -131,4 +192,5 @@ make dataset     Build both the base and instruct datasets
 make clean-data  Remove the cloned source repo and generated output
 make upload      Upload existing Parquet files + dataset card to HuggingFace
 make publish     Build both datasets, then upload them (combines dataset + upload)
+make fertility   Compute tokenizer fertility for sources in tokenizer-sources.txt
 ```
