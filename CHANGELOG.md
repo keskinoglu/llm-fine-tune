@@ -1,3 +1,9 @@
+## 0.4.0 (2026-05-20)
+
+### Feat
+
+- **analyze_tokenizer_fertility.py**: analyze tokenizer fertility for coding use-case
+
 ## 0.3.0 (2026-05-18)
 
 ### Feat
