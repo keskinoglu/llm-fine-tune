@@ -33,6 +33,7 @@ cz: commit
 
 bump:
 	uv run cz bump
+	git push origin --tags
 
 base:
 	uv run python -m llm_fine_tune.build_base_dataset
