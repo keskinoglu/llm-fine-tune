@@ -11,12 +11,15 @@ requires-python = ">=3.14"
 dependencies = [
     "polars>=1.0.0",
     "huggingface-hub>=0.32.0",
+    "transformers>=5.8.1",
+    "datasets>=4.8.5",
 ]
 
 [project.scripts]
 build-base-dataset = "llm_fine_tune.build_base_dataset:main"
 build-instruct-dataset = "llm_fine_tune.build_instruct_dataset:main"
 publish-dataset = "llm_fine_tune.upload_dataset:main"
+analyze-tokenizer-fertility = "llm_fine_tune.analyze_tokenizer_fertility:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_fine_tune"]
@@ -33,6 +36,4 @@ dev = [
     "pandas>=3.0.3",
     "pyarrow>=24.0.0",
     "matplotlib>=3.10.9",
-    "transformers>=5.8.1",
-    "datasets>=4.8.5",
 ]
