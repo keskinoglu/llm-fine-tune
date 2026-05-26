@@ -7,7 +7,8 @@ name = "llm-fine-tune"
 version = "0.4.0"
 description = "End-to-end pipeline for fine-tuning an open LLM on a custom code dataset"
 readme = "README.md"
-requires-python = ">=3.11"
+# capped at <3.13: ROCm 6.2 torch wheels only exist for cp39–cp312
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "polars>=1.0.0",
     "huggingface-hub>=0.32.0",
@@ -37,16 +38,13 @@ dev = [
     "pyarrow>=24.0.0",
     "matplotlib>=3.10.9",
 ]
-# Cluster-only. Do NOT run `uv sync --group finetune` on a local machine —
+# Cluster-only. Do NOT run `uv sync --group finetune` locally —
 # the ROCm torch wheel installs but will fail to import without AMD GPU drivers.
 finetune = [
-    # ROCm 6.2 torch has wheels only for cp39–cp312; markers restrict to supported envs
-    "torch>=2.5; python_version < '3.13' and sys_platform == 'linux'",
-    
-    # uv only routes [tool.uv.sources] indexes for direct deps, so we declare this
-    # transitive dep of torch explicitly to pull it from the ROCm index
-    "pytorch-triton-rocm>=3.1.0; python_version < '3.13' and sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git; python_version < '3.13' and sys_platform == 'linux'",
+    "torch>=2.5; sys_platform == 'linux'",
+    # uv only routes [tool.uv.sources] indexes for direct deps, not transitive ones
+    "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git; sys_platform == 'linux'",
 ]
 
 [tool.uv]
