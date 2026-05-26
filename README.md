@@ -6,7 +6,7 @@ The project is organized as a pipeline of three stages:
 
 1. **Build the dataset** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish them as the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
 2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
-3. **Fine-tune** — *(not yet implemented)* Fine-tune the chosen base model on the `instruct` configuration to specialize it for C++/Java/Python translation.
+3. **Fine-tune** — Fine-tune the chosen base model on the `instruct` configuration using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on the Goethe-NHR cluster (AMD MI210 GPUs).
 
 The dataset has two configurations:
 
@@ -61,7 +61,7 @@ uv sync
 Pass `--pull` to fetch the latest changes before building:
 
 ```bash
-uv run python -m llm_fine_tune.build_base_dataset --pull
+uv run python -m llm_fine_tune.dataset.build_base_dataset --pull
 ```
 
 Build the `base` dataset (clones `walkccc/LeetCode` on first run):
@@ -118,7 +118,7 @@ make publish
 To customise the commit message:
 
 ```bash
-uv run python -m llm_fine_tune.upload_dataset --message "Add instruct config"
+uv run python -m llm_fine_tune.dataset.upload_dataset --message "Add instruct config"
 ```
 
 Uploads use HuggingFace's [Xet storage backend](https://huggingface.co/docs/hub/xet/using-xet-storage) automatically via `huggingface-hub>=0.32.0`.
@@ -169,7 +169,7 @@ codestral-22b=mistralai/Codestral-22B-v0.1
 To evaluate against a remote HuggingFace dataset instead of the local parquet:
 
 ```bash
-uv run python -m llm_fine_tune.analyze_tokenizer_fertility \
+uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility \
   --hf-dataset tkeskin/leetcode-solutions \
   --hf-config instruct
 ```
@@ -177,18 +177,28 @@ uv run python -m llm_fine_tune.analyze_tokenizer_fertility \
 For a quick smoke test on a subset:
 
 ```bash
-uv run python -m llm_fine_tune.analyze_tokenizer_fertility --limit 100
+uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility --limit 100
 ```
 
 Use a custom tokenizer sources file:
 
 ```bash
-uv run python -m llm_fine_tune.analyze_tokenizer_fertility -s my-tokenizers.txt
+uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility -s my-tokenizers.txt
 ```
 
 ## Stage 3: Fine-tune
 
-*Not yet implemented.* The next stage will fine-tune the base model chosen in Stage 2 on the `instruct` configuration to specialize it for C++/Java/Python translation.
+Fine-tunes the base model chosen in Stage 2 on the `instruct` dataset using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory). Designed for the **Goethe-NHR cluster** (AMD MI210 GPUs, ROCm, SLURM) but the configs are cluster-agnostic.
+
+The default config targets **[openai/gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b)** with **LoRA**. Multi-GPU training uses all 8 MI210s on the node automatically via `torchrun`.
+
+See [`src/llm_fine_tune/finetune/README.md`](src/llm_fine_tune/finetune/README.md) for the full cluster setup walkthrough, and [`src/llm_fine_tune/finetune/configs/`](src/llm_fine_tune/finetune/configs/) for the training configs.
+
+To push config edits to the cluster without committing:
+
+```bash
+make finetune-sync   # requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env
+```
 
 ## Available commands
 
@@ -204,5 +214,6 @@ make dataset     Build both the base and instruct datasets
 make clean-data  Remove the cloned source repo and generated output
 make upload      Upload existing Parquet files + dataset card to HuggingFace
 make publish     Build both datasets, then upload them (combines dataset + upload)
-make fertility   Compute tokenizer fertility for sources in tokenizer-sources.txt
+make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt
+make finetune-sync   Rsync finetune/ configs and scripts to the cluster
 ```
