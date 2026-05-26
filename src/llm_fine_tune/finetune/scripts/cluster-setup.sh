@@ -14,13 +14,7 @@ set -euo pipefail
 }"
 
 # ---------------------------------------------------------------------------
-# Step 1: Load AMD ROCm — required before installing PyTorch for GPU support
-# ---------------------------------------------------------------------------
-echo "==> Loading ROCm module..."
-module load rocm/6.2.4
-
-# ---------------------------------------------------------------------------
-# Step 2: Install uv if not already present
+# Step 1: Install uv if not already present
 # ---------------------------------------------------------------------------
 if ! command -v uv &>/dev/null; then
     echo "==> Installing uv..."
@@ -32,7 +26,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 3: Install all dependencies including LLaMA-Factory and PyTorch (ROCm)
+# Step 2: Install all dependencies including LLaMA-Factory and PyTorch (ROCm)
 #
 # uv reads pyproject.toml and uv.lock and installs everything declared in
 # the `finetune` dependency group. The ROCm torch wheel is pulled automatically
@@ -47,7 +41,7 @@ cd "$REPO_DIR"
 uv sync --group finetune
 
 # ---------------------------------------------------------------------------
-# Step 4: Authenticate with HuggingFace
+# Step 3: Authenticate with HuggingFace
 #
 # openai/gpt-oss-20b is a gated model. You must accept the license on
 # https://huggingface.co/openai/gpt-oss-20b before the token will work.

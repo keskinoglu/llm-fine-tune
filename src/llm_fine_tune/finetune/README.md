@@ -21,42 +21,41 @@ finetune/
 
 ---
 
-## Prerequisites
+## One-time setup
 
-You need two environment variables set in `~/.bashrc` on the cluster **before** any of the scripts below will work:
+**1. Set your work directory** in `~/.bashrc` and reload it:
 
 ```bash
-# Your fast 5 TB work directory — venv and model checkpoints go here
 export WORK_DIR=/work/<your_group>/<your_username>
+```
 
-# Where you cloned this repo — scripts are invoked from here
+```bash
+source ~/.bashrc && echo $WORK_DIR
+```
+
+**2. Clone the repo into `$WORK_DIR`** — not `$HOME`. `/home` on Goethe is capped at ~30 GB; the venv + model weights need ~50 GB:
+
+```bash
+git clone https://github.com/keskinoglu/llm-fine-tune.git "$WORK_DIR/llm-fine-tune"
+```
+
+**3. Set `REPO_DIR`** in `~/.bashrc` to wherever you cloned it, then reload:
+
+```bash
 export REPO_DIR=$WORK_DIR/llm-fine-tune
 ```
 
-Run `source ~/.bashrc` after adding them, then verify:
-
 ```bash
-echo $WORK_DIR
-echo $REPO_DIR
+source ~/.bashrc && echo $REPO_DIR
 ```
 
----
-
-## One-time setup
-
-Clone the repo to `$REPO_DIR` (or pull if already cloned):
-
-```bash
-git clone https://github.com/tkeskin/llm-fine-tune.git "$REPO_DIR"
-```
-
-Run the setup script — this installs uv, ROCm PyTorch, and LLaMA-Factory:
+**4. Run the setup script** — installs uv, ROCm PyTorch, and LLaMA-Factory (~10 min, several GB):
 
 ```bash
 bash "$REPO_DIR/src/llm_fine_tune/finetune/scripts/cluster-setup.sh"
 ```
 
-Then log in to HuggingFace (required to download the gated `gpt-oss-20b` weights):
+**5. Log in to HuggingFace** (required to download the gated `gpt-oss-20b` weights):
 
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
