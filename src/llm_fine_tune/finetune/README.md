@@ -70,7 +70,7 @@ hf auth whoami     # verify it worked
 
 ## Running a fine-tune job
 
-**First: run the test job** (10 steps, 1 GPU, `gpu_test` partition — finishes in ~15-30 min). This verifies the full pipeline before you commit to 8 hours:
+**First: run the test job** (`gpu_test` partition with 1 GPU — finishes in ~15-30 min). This verifies the full pipeline before you commit to 8 hours:
 
 ```bash
 cd "$REPO_DIR"
