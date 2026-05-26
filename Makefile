@@ -62,6 +62,7 @@ finetune-sync:
 		echo "  CLUSTER_REPO_DIR=$(CLUSTER_REPO_DIR)"; \
 		exit 1; \
 	fi
-	rsync -av --delete \
+	rsync -av --delete --mkpath \
+		$(if $(CLUSTER_SSH_KEY),-e "ssh -i $(CLUSTER_SSH_KEY)") \
 		src/llm_fine_tune/finetune/ \
 		$(CLUSTER_HOST):$(CLUSTER_REPO_DIR)/src/llm_fine_tune/finetune/
