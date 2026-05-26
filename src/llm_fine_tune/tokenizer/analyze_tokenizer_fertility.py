@@ -65,7 +65,7 @@ def _load_texts_from_hf_dataset(
 
 
 def _metrics_for_tokenizer(texts: list[str], tokenizer) -> dict[str, float]:
-    """All metrics are corpus-level (sum/sum, not per-sample average). Words are \w+ matches
+    r"""All metrics are corpus-level (sum/sum, not per-sample average). Words are \w+ matches
     ([a-zA-Z0-9_]), so snake_case counts as one word and camelCase counts as one word."""
     total_tokens = 0
     total_words = 0

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import polars as pl
 
-from llm_fine_tune.instruction_generator import generate_instruction
+from llm_fine_tune.dataset.instruction_generator import generate_instruction
 
 BASE_PARQUET_PATH = Path("output/leetcode-solutions.parquet")
 OUTPUT_DIR = Path("output")
