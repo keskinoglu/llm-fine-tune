@@ -1,0 +1,42 @@
+### model
+model_name_or_path: openai/gpt-oss-20b
+# harmony chat format — model-specific, do not change
+template: gpt-oss
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+
+### dataset
+# resolved via --dataset_dir injected by the SLURM script at runtime
+dataset: leetcode_instruct
+cutoff_len: 2048
+preprocessing_num_workers: 8
+
+### precision
+# Use bf16, not fp16. The AMD MI210 supports bf16 natively, and gpt-oss
+# training is numerically unstable in fp16. Do NOT change this on this hardware.
+bf16: true
+
+### training hyperparameters
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+logging_steps: 10
+save_steps: 200
+plot_loss: true
+
+### multi-GPU coordination
+# ddp_timeout is set very high so the rank that finishes loading the dataset
+# first does not trip the NCCL/gloo barrier timeout while other ranks are still
+# downloading and preprocessing. The default (30 min) is too short for large models.
+ddp_timeout: 180000000
+
+### output
+# output_dir is NOT set here — it is injected by submit-finetune.sh at runtime
+# so each config gets its own named directory under $WORK_DIR/saves/.

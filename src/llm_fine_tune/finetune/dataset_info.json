@@ -1,0 +1,11 @@
+{
+  "leetcode_instruct": {
+    "hf_hub_url": "tkeskin/leetcode-solutions",
+    "subset": "instruct",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}
