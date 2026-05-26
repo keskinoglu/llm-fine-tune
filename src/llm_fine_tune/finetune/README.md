@@ -13,8 +13,9 @@ finetune/
   configs/
     gpt-oss-20b-lora.yaml   — LLaMA-Factory training config (add more here for new models/methods)
   scripts/
-    cluster-setup.sh        — one-time install: uv, ROCm torch, LLaMA-Factory
-    submit-finetune.sh      — SLURM batch script; takes a config path as argument
+    cluster-setup.sh              — one-time install: uv, ROCm torch, LLaMA-Factory
+    submit-finetune-test.sh       — SLURM test job: 10 steps, 1 GPU, gpu_test partition
+    submit-finetune.sh            — SLURM real job: all 8 GPUs, gpu partition, 8 hours
   dataset_info.json         — LLaMA-Factory dataset registration (points to HF Hub)
   README.md                 — this file
 ```
@@ -55,17 +56,42 @@ source ~/.bashrc && echo $REPO_DIR
 bash "$REPO_DIR/src/llm_fine_tune/finetune/scripts/cluster-setup.sh"
 ```
 
-**5. Log in to HuggingFace** (required to download the gated `gpt-oss-20b` weights):
+**5. Log in to HuggingFace** — the setup script installs everything but does not log you in. Run these yourself after it finishes. `hf auth login` is what prompts you to paste your token.
+
+You must also accept the model license at [huggingface.co/openai/gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b) in your browser before the token will work.
 
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
-huggingface-cli login      # paste your HF token when prompted
-huggingface-cli whoami     # verify it worked
+hf auth login
+hf auth whoami     # verify it worked
 ```
 
 ---
 
 ## Running a fine-tune job
+
+**First: run the test job** (10 steps, 1 GPU, `gpu_test` partition — finishes in ~15-30 min). This verifies the full pipeline before you commit to 8 hours:
+
+```bash
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/scripts/submit-finetune-test.sh \
+    src/llm_fine_tune/finetune/configs/gpt-oss-20b-lora.yaml
+```
+
+Monitor it:
+
+```bash
+squeue -u $USER            # PD = pending, R = running, CG = completing
+tail -f finetune_test_*.out
+```
+
+Look for these success markers in the log (in order):
+1. `Loading checkpoint shards` — model weights loading
+2. `trainable params:` — LoRA adapter initialized
+3. `{'loss': X.XX, 'learning_rate': ...}` — training step completed
+4. `max_steps reached` or `Training completed`
+
+**Then: submit the real job** (all 8 GPUs, `gpu` partition, up to 8 hours):
 
 ```bash
 cd "$REPO_DIR"
@@ -73,15 +99,12 @@ sbatch src/llm_fine_tune/finetune/scripts/submit-finetune.sh \
     src/llm_fine_tune/finetune/configs/gpt-oss-20b-lora.yaml
 ```
 
-Monitor the job:
-
 ```bash
-squeue -u $USER            # see queue status (PD = pending, R = running)
-sqtimes                    # estimated start time
-tail -f finetune_*.out     # stream the training log
+squeue -u $USER
+tail -f finetune_*.out
 ```
 
-Checkpoints are saved under `$WORK_DIR/saves/gpt-oss-20b-lora/`.
+Checkpoints are saved every 200 steps under `$WORK_DIR/saves/gpt-oss-20b-lora/`.
 
 ---
 
