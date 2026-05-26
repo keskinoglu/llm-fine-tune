@@ -5,21 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "llm-fine-tune"
 version = "0.4.0"
-description = "Tools to build the leetcode-solutions HuggingFace dataset"
+description = "End-to-end pipeline for fine-tuning an open LLM on a custom code dataset"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "polars>=1.0.0",
     "huggingface-hub>=0.32.0",
-    "transformers>=5.8.1",
-    "datasets>=4.8.5",
+    "transformers>=4.55.0",
+    "datasets>=4.0.0",
 ]
 
 [project.scripts]
-build-base-dataset = "llm_fine_tune.build_base_dataset:main"
-build-instruct-dataset = "llm_fine_tune.build_instruct_dataset:main"
-publish-dataset = "llm_fine_tune.upload_dataset:main"
-analyze-tokenizer-fertility = "llm_fine_tune.analyze_tokenizer_fertility:main"
+build-base-dataset = "llm_fine_tune.dataset.build_base_dataset:main"
+build-instruct-dataset = "llm_fine_tune.dataset.build_instruct_dataset:main"
+publish-dataset = "llm_fine_tune.dataset.upload_dataset:main"
+analyze-tokenizer-fertility = "llm_fine_tune.tokenizer.analyze_tokenizer_fertility:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_fine_tune"]
@@ -33,7 +33,30 @@ dev = [
     "ruff>=0.1.0",
     "commitizen>=3.0.0",
     "ipykernel>=7.2.0",
-    "pandas>=3.0.3",
+    "pandas>=2.0",
     "pyarrow>=24.0.0",
     "matplotlib>=3.10.9",
 ]
+# Cluster-only. Do NOT run `uv sync --group finetune` on a local machine —
+# the ROCm torch wheel installs but will fail to import without AMD GPU drivers.
+finetune = [
+    # ROCm 6.2 torch has wheels only for cp39–cp312; markers restrict to supported envs
+    "torch>=2.5; python_version < '3.13' and sys_platform == 'linux'",
+    
+    # uv only routes [tool.uv.sources] indexes for direct deps, so we declare this
+    # transitive dep of torch explicitly to pull it from the ROCm index
+    "pytorch-triton-rocm>=3.1.0; python_version < '3.13' and sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git; python_version < '3.13' and sys_platform == 'linux'",
+]
+
+[tool.uv]
+environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-rocm" }]
+pytorch-triton-rocm = [{ index = "pytorch-rocm" }]
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.2"
+explicit = true
