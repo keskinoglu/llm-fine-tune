@@ -41,12 +41,12 @@ dev = [
 # Cluster-only. Do NOT run `uv sync --group finetune` locally —
 # the ROCm torch wheel installs but will fail to import without AMD GPU drivers.
 finetune = [
+    # torch, torchvision, torchaudio, and triton must all be listed as direct deps:
+    # uv only routes [tool.uv.sources] indexes for direct deps, not transitive ones.
+    # Otherwise they're pulled as CUDA builds from PyPI and fail to load on ROCm nodes.
     "torch>=2.5; sys_platform == 'linux'",
-    # torchvision must be a direct dep — uv only routes [tool.uv.sources] indexes
-    # for direct deps, not transitive ones; without this it pulls a CPU/CUDA build
-    # from PyPI and mismatches with the ROCm torch wheel
     "torchvision; sys_platform == 'linux'",
-    # uv only routes [tool.uv.sources] indexes for direct deps, not transitive ones
+    "torchaudio; sys_platform == 'linux'",
     "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git; sys_platform == 'linux'",
 ]
@@ -57,6 +57,7 @@ environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
 [tool.uv.sources]
 torch = [{ index = "pytorch-rocm" }]
 torchvision = [{ index = "pytorch-rocm" }]
+torchaudio = [{ index = "pytorch-rocm" }]
 pytorch-triton-rocm = [{ index = "pytorch-rocm" }]
 
 [[tool.uv.index]]
