@@ -157,3 +157,42 @@ LLaMA-Factory resolves datasets via its `--dataset_dir` flag. The `submit-finetu
 ## Do not run `uv sync --group finetune` locally
 
 The `finetune` dependency group installs a ROCm-specific PyTorch wheel. On a machine without AMD GPU drivers, the wheel installs but `import torch` will fail. Restrict this group to the cluster.
+
+---
+
+## Cluster quick-reference
+
+**Watch the job queue:**
+```bash
+watch -n 1 'squeue -u $USER'
+```
+Status codes: `PD` pending, `R` running, `CG` completing, `F` failed, `CA` cancelled, `TO` timed out
+
+**Get the log path for a running job:**
+```bash
+scontrol show job <JOBID> | grep StdOut
+```
+
+**Tail a job log:**
+```bash
+tail -f <path/to/logfile>.out
+```
+
+**Rebuild the entire venv from scratch on a compute node:**
+```bash
+sbatch --partition=test --nodes=1 --ntasks=1 --cpus-per-task=8 --mem=32g --time=00:30:00 \
+  --output=setup_%j.out \
+  --wrap="source ~/.bashrc && cd \$REPO_DIR && uv venv --clear && uv sync --group finetune --verbose"
+```
+
+**Reinstall a single package on a compute node** (e.g. after fixing a version pin):
+```bash
+sbatch --partition=test --nodes=1 --ntasks=1 --cpus-per-task=8 --mem=16g --time=00:15:00 \
+  --output=setup_%j.out \
+  --wrap="source ~/.bashrc && cd \$REPO_DIR && uv sync --group finetune --verbose --reinstall-package <package-name>"
+```
+
+**Cancel a job:**
+```bash
+scancel <JOBID>
+```
