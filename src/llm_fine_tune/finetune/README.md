@@ -34,6 +34,16 @@ export WORK_DIR=/work/<your_group>/<your_username>
 source ~/.bashrc && echo $WORK_DIR
 ```
 
+> **To make these permanent** (so they survive logout and `sbatch` sees them), append both vars to `~/.bashrc` in one go — running `export` at the prompt only lasts for the current session:
+> ```bash
+> cat >> ~/.bashrc <<'EOF'
+>
+> export WORK_DIR=/work/<your_group>/<your_username>
+> export REPO_DIR=$WORK_DIR/llm-fine-tune
+> EOF
+> bash -l -c 'echo "$WORK_DIR $REPO_DIR"'
+> ```
+
 **2. Clone the repo into `$WORK_DIR`** — not `$HOME`. `/home` on Goethe is capped at ~30 GB; the venv + model weights need ~50 GB:
 
 ```bash
