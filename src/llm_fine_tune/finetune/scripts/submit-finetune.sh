@@ -66,5 +66,5 @@ echo "    Output dir: $OUTPUT_DIR"
 echo ""
 
 FORCE_TORCHRUN=1 llamafactory-cli train "$REPO_DIR/$CONFIG" \
-    --dataset_dir "$REPO_DIR/src/llm_fine_tune/finetune" \
-    --output_dir "$OUTPUT_DIR"
+    dataset_dir="$REPO_DIR/src/llm_fine_tune/finetune" \
+    output_dir="$OUTPUT_DIR"
