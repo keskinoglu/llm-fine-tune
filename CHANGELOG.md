@@ -1,3 +1,26 @@
+## 1.0.0 (2026-05-29)
+
+### Feat
+
+- **submit-finetune-test.sh**: add a finetune testing script before a full finetune job is submitted
+- **Makefile,-.env.example**: add ssh-key login to finetune-sync command
+- **finetune/**: add finetune scripts and configs for running finetune job the Goethe HPC cluster
+
+### Fix
+
+- **gpt-oss-20b-lora.yaml**: gpt-oss -> gpt_oss
+- **submit-finetune.sh,-submit-finetune-test.sh**: fix llama-factory cli overrides
+- **pyproject.toml**: require torchaudio to pull from the pytorch-rocm source
+- **cluster-setup.sh**: make uv install have --verbose output
+- **cluster-setup.sh,-submit-setup.sh,-REAMDE.md**: build env on test cpu, update README accordingly
+- **cluster-setpu.sh,-README.md**: update script and README to move uv cache to repo system so it can hardlink
+- **cluster-setup.sh**: change huggingface-cli to hf
+- **cluster-setup.sh,-README.md**: remove premature rocm module loading
+
+### Refactor
+
+- **src/**: restructure project
+
 ## 0.4.0 (2026-05-20)
 
 ### Feat
