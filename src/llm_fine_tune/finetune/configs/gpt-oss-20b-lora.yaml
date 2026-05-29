@@ -1,7 +1,7 @@
 ### model
 model_name_or_path: openai/gpt-oss-20b
 # harmony chat format — model-specific, do not change
-template: gpt-oss
+template: gpt_oss
 
 ### method
 stage: sft
