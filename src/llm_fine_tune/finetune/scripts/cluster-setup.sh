@@ -43,7 +43,7 @@ echo "==> uv cache → $UV_CACHE_DIR"
 
 echo "==> Installing dependencies (this downloads torch ROCm + transformers — ~10 min)..."
 cd "$REPO_DIR"
-uv sync --group finetune
+uv sync --group finetune --no-progress
 
 # ---------------------------------------------------------------------------
 # Step 3: Authenticate with HuggingFace

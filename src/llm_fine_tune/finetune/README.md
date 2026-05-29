@@ -14,6 +14,7 @@ finetune/
     gpt-oss-20b-lora.yaml   — LLaMA-Factory training config (add more here for new models/methods)
   scripts/
     cluster-setup.sh              — one-time install: uv, ROCm torch, LLaMA-Factory
+    submit-setup.sh               — SLURM wrapper: runs cluster-setup.sh on a compute node
     submit-finetune-test.sh       — SLURM test job: 10 steps, 1 GPU, gpu_test partition
     submit-finetune.sh            — SLURM real job: all 8 GPUs, gpu partition, 8 hours
   dataset_info.json         — LLaMA-Factory dataset registration (points to HF Hub)
@@ -64,11 +65,24 @@ export REPO_DIR=$WORK_DIR/llm-fine-tune
 source ~/.bashrc && echo $REPO_DIR
 ```
 
-**4. Run the setup script** — installs uv, ROCm PyTorch, and LLaMA-Factory (~10 min, several GB):
+**4. Run the setup script** — installs uv, ROCm PyTorch, and LLaMA-Factory (~15 min, several GB).
+
+The setup runs `uv sync` which extracts the ROCm torch wheel as a batch job on the `test` partition:
 
 ```bash
-bash "$REPO_DIR/src/llm_fine_tune/finetune/scripts/cluster-setup.sh"
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/scripts/submit-setup.sh
 ```
+
+Monitor it:
+
+```bash
+squeue -u $USER
+scontrol show job <JOBID> | grep StdOut   # get the exact log path
+tail -f setup_<JOBID>.out
+```
+
+Look for `==> Setup complete!` at the end of the log.
 
 **5. Log in to HuggingFace** — the setup script installs everything but does not log you in. Run these yourself after it finishes. `hf auth login` is what prompts you to paste your token.
 
