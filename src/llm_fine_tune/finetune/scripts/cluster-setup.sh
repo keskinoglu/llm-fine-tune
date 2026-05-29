@@ -36,6 +36,11 @@ fi
 # The .venv/ is created under $REPO_DIR, which must be on /work (not /home)
 # because the venv with torch + transformers exceeds the 30 GB /home quota.
 # ---------------------------------------------------------------------------
+export UV_CACHE_DIR="$(dirname "$REPO_DIR")/.cache/uv"
+export UV_LINK_MODE=hardlink
+mkdir -p "$UV_CACHE_DIR"
+echo "==> uv cache → $UV_CACHE_DIR"
+
 echo "==> Installing dependencies (this downloads torch ROCm + transformers — ~10 min)..."
 cd "$REPO_DIR"
 uv sync --group finetune

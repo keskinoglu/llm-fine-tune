@@ -34,15 +34,19 @@ export WORK_DIR=/work/<your_group>/<your_username>
 source ~/.bashrc && echo $WORK_DIR
 ```
 
-> **To make these permanent** (so they survive logout and `sbatch` sees them), append both vars to `~/.bashrc` in one go — running `export` at the prompt only lasts for the current session:
+> **To make these permanent** (so they survive logout and `sbatch` sees them), append all vars to `~/.bashrc` in one go — running `export` at the prompt only lasts for the current session:
 > ```bash
 > cat >> ~/.bashrc <<'EOF'
 >
 > export WORK_DIR=/work/<your_group>/<your_username>
 > export REPO_DIR=$WORK_DIR/llm-fine-tune
+> export UV_CACHE_DIR=$WORK_DIR/.cache/uv
+> export UV_LINK_MODE=hardlink
 > EOF
-> bash -l -c 'echo "$WORK_DIR $REPO_DIR"'
+> bash -l -c 'echo "$WORK_DIR $REPO_DIR $UV_CACHE_DIR"'
 > ```
+>
+> `UV_CACHE_DIR` redirects uv's cache from `~/.cache/uv` (on the 30 GB `/home` quota) to `/work`. `UV_LINK_MODE=hardlink` avoids redundant copies when the cache and venv are on the same filesystem.
 
 **2. Clone the repo into `$WORK_DIR`** — not `$HOME`. `/home` on Goethe is capped at ~30 GB; the venv + model weights need ~50 GB:
 
