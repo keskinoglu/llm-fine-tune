@@ -102,6 +102,51 @@ Checkpoints are saved under `$WORK_DIR/saves/llama-3.2-1b-lora/`.
 
 ---
 
+## Merging and publishing the fine-tuned model
+
+After training, the saved directory contains only the LoRA adapter deltas. The merge step fuses
+those deltas into the base model weights to produce a self-contained model you can push to HuggingFace.
+
+**Prerequisite: HF write token.** The token cached via `hf auth login` may only have read access
+(sufficient for downloading the gated Llama model). Pushing a model requires write access to
+`tkeskin/` repos. If the push returns 401/403, re-run `hf auth login` with a write-scoped token.
+
+**Merge + publish in one job:**
+```bash
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
+    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
+    "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
+    tkeskin/llama-3.2-1b-instruct-code-translation
+```
+
+Monitor:
+```bash
+tail -f merge_*.out
+```
+
+The job saves the merged model to `$WORK_DIR/exports/<run-name>/`, then uploads it. On success
+the log ends with `Done! https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation`.
+
+**Merge only (publish manually later):** omit the repo id argument:
+```bash
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
+    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
+    "$WORK_DIR/saves/test-llama-3.2-1b-lora"
+```
+
+Then publish (or re-publish with a new commit message / version tag) directly:
+```bash
+source "$REPO_DIR/.venv/bin/activate"
+publish-model \
+    --model-dir "$WORK_DIR/exports/test-llama-3.2-1b-lora" \
+    --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
+    --message "Add fully trained v1" \
+    --tag v1
+```
+
+---
+
 ## Cluster quick-reference
 
 **Watch the job queue:**

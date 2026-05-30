@@ -52,3 +52,28 @@ launch_training() {
         output_dir="$output_dir" \
         "$@"
 }
+
+# ---------------------------------------------------------------------------
+# merge_lora <repo-relative-config> <adapter_dir> <export_dir>
+#
+# Fuses a LoRA adapter into the base model and writes the merged weights.
+# Single-process (no torchrun, no dataset) — CPU merge is exact and avoids
+# GPU OOM on large models.
+# ---------------------------------------------------------------------------
+merge_lora() {
+    local config="$1"
+    local adapter_dir="$2"
+    local export_dir="$3"
+
+    source "$REPO_DIR/.venv/bin/activate"
+
+    echo "==> Merging LoRA adapter into base model"
+    echo "    Config:      $REPO_DIR/$config"
+    echo "    Adapter dir: $adapter_dir"
+    echo "    Export dir:  $export_dir"
+    echo ""
+
+    llamafactory-cli export "$REPO_DIR/$config" \
+        adapter_name_or_path="$adapter_dir" \
+        export_dir="$export_dir"
+}

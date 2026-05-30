@@ -20,6 +20,7 @@ dependencies = [
 build-base-dataset = "llm_fine_tune.dataset.build_base_dataset:main"
 build-instruct-dataset = "llm_fine_tune.dataset.build_instruct_dataset:main"
 publish-dataset = "llm_fine_tune.dataset.upload_dataset:main"
+publish-model = "llm_fine_tune.publish.upload_model:main"
 analyze-tokenizer-fertility = "llm_fine_tune.tokenizer.analyze_tokenizer_fertility:main"
 
 [tool.hatch.metadata]

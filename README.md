@@ -2,11 +2,12 @@
 
 Fine-tune an open LLM to translate code between **C++**, **Java**, and **Python**.
 
-The project is organized as a pipeline of three stages:
+The project is organized as a pipeline of four stages:
 
 1. **Build the dataset** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish them as the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
 2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
 3. **Fine-tune** — Fine-tune the chosen base model on the `instruct` configuration using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on the Goethe-NHR cluster (AMD MI210 GPUs).
+4. **Publish the model** — Merge the LoRA adapter into the base weights and push the standalone fine-tuned model to [`tkeskin/llama-3.2-1b-instruct-code-translation`](https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation) on HuggingFace.
 
 The dataset has two configurations:
 
@@ -204,6 +205,40 @@ To push config edits to the cluster without committing:
 make finetune-sync   # requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env
 ```
 
+## Stage 4: Publish the fine-tuned model
+
+LoRA training saves only the adapter deltas — not a standalone model. The publish stage merges those
+deltas into the base weights and pushes the result to HuggingFace as
+[`tkeskin/llama-3.2-1b-instruct-code-translation`](https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation).
+
+The merge runs on the cluster (where the adapter, base model cache, and venv live). The publish step
+uses the `publish-model` entry point, which handles repo creation, model card injection, upload, and
+optional version tagging.
+
+**Merge + publish in one SLURM job (Goethe):**
+```bash
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
+    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
+    "$WORK_DIR/saves/<run-name>" \
+    tkeskin/llama-3.2-1b-instruct-code-translation
+```
+
+**Re-publish an already-merged model** (e.g. after a full training run, or to add a version tag):
+```bash
+source "$REPO_DIR/.venv/bin/activate"
+publish-model \
+    --model-dir "$WORK_DIR/exports/<run-name>" \
+    --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
+    --message "Fully trained v1 (3 epochs)" \
+    --tag v1
+```
+
+See [`src/llm_fine_tune/finetune/hpc/goethe/README.md`](src/llm_fine_tune/finetune/hpc/goethe/README.md)
+for the full merge + publish workflow including HF token requirements.
+
+---
+
 ## Available commands
 
 ```
@@ -220,4 +255,5 @@ make upload      Upload existing Parquet files + dataset card to HuggingFace
 make publish     Build both datasets, then upload them (combines dataset + upload)
 make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt
 make finetune-sync   Rsync finetune/ configs and scripts to the cluster
+publish-model        Merge + push: upload a merged model directory to HuggingFace
 ```

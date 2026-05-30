@@ -59,6 +59,26 @@ is kept for reference; use `llama-3.2-1b-lora.yaml` for anything that needs to r
 
 ---
 
+## After training: merge and publish
+
+LoRA training saves only the low-rank adapter deltas, not a standalone model. To get a model you can
+actually use (and push to HuggingFace), merge the adapter into the base weights:
+
+```bash
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
+    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
+    "$WORK_DIR/saves/<run-name>" \
+    tkeskin/llama-3.2-1b-instruct-code-translation
+```
+
+`configs/llama-3.2-1b-merge.yaml` is the portable export config. The cluster job script injects
+`adapter_name_or_path` and `export_dir` at runtime. If you omit the repo id argument, the script
+merges only and prints the `publish-model` command to run manually.
+
+See [`hpc/goethe/README.md`](hpc/goethe/README.md) for the full workflow including HF token requirements.
+
+---
+
 ## Adding a new config
 
 Drop a YAML in `configs/` and pass its path to the cluster's submit script. Common variants:
