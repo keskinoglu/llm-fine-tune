@@ -28,6 +28,7 @@ CONFIG="${1:?
   Usage: sbatch submit-test.sh src/llm_fine_tune/finetune/configs/<name>.yaml
 }"
 
+module load rocm/6.2.4
 source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/goethe/env.sh"
 source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/common.sh"
 
