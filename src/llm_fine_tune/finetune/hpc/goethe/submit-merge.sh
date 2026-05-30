@@ -7,10 +7,11 @@
 #   sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
 #       src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
 #       "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
-#       [tkeskin/llama-3.2-1b-instruct-code-translation]
+#       [tkeskin/llama-3.2-1b-instruct-code-translation] \
+#       [v0.1]
 #
-#   If the repo_id argument is omitted, the script merges only and prints
-#   the publish-model command to run manually.
+#   repo_id omitted → merge only, prints the publish-model command to run manually.
+#   tag omitted     → no git tag applied to the HF repo.
 #
 # Required env vars (set in ~/.bashrc):
 #   WORK_DIR  — e.g. /work/<group>/<user>
@@ -37,6 +38,7 @@ ADAPTER_DIR="${2:?
   Example: \$WORK_DIR/saves/test-llama-3.2-1b-lora
 }"
 REPO_ID="${3:-}"
+TAG="${4:-}"
 
 module load rocm/6.2.4
 source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/goethe/env.sh"
@@ -51,10 +53,10 @@ merge_lora "$CONFIG" "$ADAPTER_DIR" "$EXPORT_DIR"
 if [[ -n "$REPO_ID" ]]; then
     echo ""
     echo "==> Publishing merged model to $REPO_ID"
-    publish-model --model-dir "$EXPORT_DIR" --repo-id "$REPO_ID"
+    publish-model --model-dir "$EXPORT_DIR" --repo-id "$REPO_ID" ${TAG:+--tag "$TAG"}
 else
     echo ""
     echo "==> Merge complete. To publish, run:"
     echo "    source \$REPO_DIR/.venv/bin/activate"
-    echo "    publish-model --model-dir \"$EXPORT_DIR\" --repo-id tkeskin/llama-3.2-1b-instruct-code-translation"
+    echo "    publish-model --model-dir \"$EXPORT_DIR\" --repo-id tkeskin/llama-3.2-1b-instruct-code-translation [--tag v0.1]"
 fi
