@@ -188,11 +188,15 @@ uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility -s my-token
 
 ## Stage 3: Fine-tune
 
-Fine-tunes the base model chosen in Stage 2 on the `instruct` dataset using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory). Designed for the **Goethe-NHR cluster** (AMD MI210 GPUs, ROCm, SLURM) but the configs are cluster-agnostic.
+Fine-tunes the base model chosen in Stage 2 on the `instruct` dataset using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on an HPC cluster.
 
-The default config targets **[openai/gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b)** with **LoRA**. Multi-GPU training uses all 8 MI210s on the node automatically via `torchrun`.
+The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)** with **LoRA** using `flash_attn: sdpa` — runs on AMD ROCm and NVIDIA CUDA without any FlashAttention library. Multi-GPU training via `torchrun` is automatic.
 
-See [`src/llm_fine_tune/finetune/README.md`](src/llm_fine_tune/finetune/README.md) for the full cluster setup walkthrough, and [`src/llm_fine_tune/finetune/configs/`](src/llm_fine_tune/finetune/configs/) for the training configs.
+The training configs are hardware-agnostic. Cluster-specific scripts live under `hpc/`:
+- **AMD / ROCm / SLURM (Goethe):** [`hpc/goethe/`](src/llm_fine_tune/finetune/hpc/goethe/)
+- **NVIDIA / CUDA / HTCondor (Saarland):** [`hpc/saarland/`](src/llm_fine_tune/finetune/hpc/saarland/)
+
+See [`src/llm_fine_tune/finetune/README.md`](src/llm_fine_tune/finetune/README.md) for the full overview.
 
 To push config edits to the cluster without committing:
 

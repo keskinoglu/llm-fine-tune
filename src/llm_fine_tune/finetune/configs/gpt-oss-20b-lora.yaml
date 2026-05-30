@@ -1,3 +1,14 @@
+# =============================================================================
+# ADVANCED / NVIDIA-HOPPER-ONLY
+#
+# LLaMA-Factory unconditionally forces FlashAttention-3 for gpt_oss (hardcoded
+# in configure_attn_implementation). FA3 requires NVIDIA Hopper (H100/H200) —
+# it will NOT run on AMD GPUs or pre-Hopper NVIDIA (A100, V100, etc.).
+# The `flash_attn` setting below is ignored for this model type.
+#
+# Use configs/llama-3.2-1b-lora.yaml for a config that runs on any hardware.
+# =============================================================================
+
 ### model
 model_name_or_path: openai/gpt-oss-20b
 # harmony chat format — model-specific, do not change

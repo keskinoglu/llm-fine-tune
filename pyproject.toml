@@ -22,6 +22,9 @@ build-instruct-dataset = "llm_fine_tune.dataset.build_instruct_dataset:main"
 publish-dataset = "llm_fine_tune.dataset.upload_dataset:main"
 analyze-tokenizer-fertility = "llm_fine_tune.tokenizer.analyze_tokenizer_fertility:main"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_fine_tune"]
 
@@ -38,29 +41,60 @@ dev = [
     "pyarrow>=24.0.0",
     "matplotlib>=3.10.9",
 ]
-# Cluster-only. Do NOT run `uv sync --group finetune` locally —
-# the ROCm torch wheel installs but will fail to import without AMD GPU drivers.
-finetune = [
-    # torch, torchvision, torchaudio, and triton must all be listed as direct deps:
-    # uv only routes [tool.uv.sources] indexes for direct deps, not transitive ones.
-    # Otherwise they're pulled as CUDA builds from PyPI and fail to load on ROCm nodes.
+
+[project.optional-dependencies]
+# Cluster-only extras. Do NOT run `uv sync --extra rocm` or `--extra cuda` locally —
+# torch wheels install but fail to import without GPU drivers.
+# torch, torchvision, torchaudio must be listed as direct deps so uv applies the
+# [tool.uv.sources] index routing (only direct deps get routed, not transitive ones).
+#
+# AMD / ROCm (e.g. Goethe MI210):    uv sync --extra rocm
+rocm = [
+    "llm-fine-tune[finetune]",
     "torch>=2.5; sys_platform == 'linux'",
     "torchvision; sys_platform == 'linux'",
     "torchaudio; sys_platform == 'linux'",
     "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git; sys_platform == 'linux'",
+]
+# NVIDIA / CUDA (e.g. any CUDA cluster): uv sync --extra cuda
+cuda = [
+    "llm-fine-tune[finetune]",
+    "torch>=2.5; sys_platform == 'linux'",
+    "torchvision; sys_platform == 'linux'",
+    "torchaudio; sys_platform == 'linux'",
+]
+# Shared finetune stack — pulled in by both rocm and cuda above.
+finetune = [
+    "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git",
 ]
 
 [tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
+conflicts = [[{ extra = "rocm" }, { extra = "cuda" }]]
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-rocm" }]
-torchvision = [{ index = "pytorch-rocm" }]
-torchaudio = [{ index = "pytorch-rocm" }]
-pytorch-triton-rocm = [{ index = "pytorch-rocm" }]
+torch = [
+    { index = "pytorch-rocm", extra = "rocm" },
+    { index = "pytorch-cuda", extra = "cuda" },
+]
+torchvision = [
+    { index = "pytorch-rocm", extra = "rocm" },
+    { index = "pytorch-cuda", extra = "cuda" },
+]
+torchaudio = [
+    { index = "pytorch-rocm", extra = "rocm" },
+    { index = "pytorch-cuda", extra = "cuda" },
+]
+pytorch-triton-rocm = [{ index = "pytorch-rocm", extra = "rocm" }]
 
 [[tool.uv.index]]
 name = "pytorch-rocm"
 url = "https://download.pytorch.org/whl/rocm6.2"
+explicit = true
+
+[[tool.uv.index]]
+# CUDA version — confirm via `nvidia-smi` on the NVIDIA cluster before first use.
+# cu124 covers CUDA 12.4 (common on A100/H100 nodes as of 2025-2026).
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true
