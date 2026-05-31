@@ -230,9 +230,12 @@ source "$REPO_DIR/.venv/bin/activate"
 publish-model \
     --model-dir "$WORK_DIR/exports/<run-name>" \
     --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
+    --card llama-3.2-1b \
     --message "Fully trained v1 (3 epochs)" \
     --tag v1
 ```
+
+`--card <name>` injects `publish/model_card/<name>.md` as the HuggingFace model card. Available: `llama-3.2-1b`, `qwen-3.5-0.8b`, `gemma-3-1b-it`, `mistral-7b-v0.3`, `qwen2.5-coder-1.5b`. Omit to skip.
 
 See [`src/llm_fine_tune/finetune/hpc/goethe/README.md`](src/llm_fine_tune/finetune/hpc/goethe/README.md)
 for the full merge + publish workflow including HF token requirements.

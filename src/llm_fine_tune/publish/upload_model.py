@@ -8,13 +8,18 @@ from huggingface_hub import HfApi
 
 DEFAULT_REPO_ID = "tkeskin/llama-3.2-1b-instruct-code-translation"
 DEFAULT_COMMIT_MESSAGE = "Upload merged model"
-_MODEL_CARD_SRC = Path(__file__).parent / "model_card" / "README.md"
+_MODEL_CARD_DIR = Path(__file__).parent / "model_card"
 
 
-def _inject_model_card(model_dir: Path) -> None:
-    dest = model_dir / "README.md"
-    if not dest.exists():
-        shutil.copy(_MODEL_CARD_SRC, dest)
+def _inject_model_card(model_dir: Path, card_name: str) -> None:
+    src = _MODEL_CARD_DIR / f"{card_name}.md"
+    if not src.exists():
+        available = [p.stem for p in sorted(_MODEL_CARD_DIR.glob("*.md"))]
+        raise FileNotFoundError(
+            f"No model card '{card_name}.md' in {_MODEL_CARD_DIR}\n"
+            f"Available: {available}"
+        )
+    shutil.copy(src, model_dir / "README.md")
 
 
 def _create_repo(api: HfApi, repo_id: str, private: bool) -> None:
@@ -63,6 +68,15 @@ def main() -> None:
         help="Optional git tag to apply after upload, e.g. v1.",
     )
     parser.add_argument(
+        "--card",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Model card to inject as README.md (e.g. 'llama-3.2-1b' → model_card/llama-3.2-1b.md). "
+            "If omitted, no card is written."
+        ),
+    )
+    parser.add_argument(
         "--private",
         action="store_true",
         help="Create the repo as private (default: public).",
@@ -75,7 +89,8 @@ def main() -> None:
             "Run the merge job first: sbatch .../submit-merge.sh"
         )
 
-    _inject_model_card(args.model_dir)
+    if args.card:
+        _inject_model_card(args.model_dir, args.card)
 
     api = HfApi()
     _create_repo(api, args.repo_id, args.private)
