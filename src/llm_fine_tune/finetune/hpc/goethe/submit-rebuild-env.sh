@@ -46,5 +46,5 @@ uv sync --extra rocm --verbose
 echo ""
 echo "==> Env rebuild complete!"
 python_bin="$REPO_DIR/.venv/bin/python"
-echo "    torch: $("$python_bin" -c 'import torch; print(torch.__version__)')"
-echo "    device: $("$python_bin" -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no GPU visible from CPU-only node")')"
+echo "    torch:  $("$python_bin" -c 'import torch; print(torch.__version__)')"
+echo "    rocm:   ${ROCM_PATH:-not set}"
