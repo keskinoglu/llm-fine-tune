@@ -1,0 +1,41 @@
+### model
+# Apache 2.0 — no HF login or license acceptance required.
+model_name_or_path: mistralai/Mistral-7B-Instruct-v0.3
+template: mistral
+# sdpa runs on AMD ROCm and NVIDIA CUDA alike — no flash-attn library needed.
+flash_attn: sdpa
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+
+### dataset
+# resolved via dataset_dir injected by the cluster job script at runtime
+dataset: leetcode_instruct
+cutoff_len: 2048
+preprocessing_num_workers: 8
+
+### precision
+# bf16 works on AMD MI210 and NVIDIA Ampere+ (compute capability >= 8.0, e.g. A100/H100).
+# For older NVIDIA GPUs (e.g. V100, sm_70): set bf16: false and fp16: true.
+bf16: true
+
+### training hyperparameters
+# 7B model: LoRA keeps VRAM well within one MI210 (64 GB). Single-GPU test job works fine.
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+logging_steps: 10
+save_steps: 200
+plot_loss: true
+
+### multi-GPU coordination
+ddp_timeout: 180000000
+
+### output
+# output_dir is NOT set here — injected by the cluster job script at runtime.

@@ -1,0 +1,15 @@
+### model
+# Gemma 3 (not Gemma 2). See gemma-3-1b-it-lora.yaml for flash_attn notes.
+model_name_or_path: google/gemma-3-1b-it
+template: gemma3
+# adapter_name_or_path injected at runtime by the cluster job script
+
+### method
+finetuning_type: lora
+
+### export
+# export_dir injected at runtime by the cluster job script
+export_size: 5              # shard size in GB; a 1B model fits in one shard
+export_device: cpu          # merge arithmetic on CPU — exact, no risk of GPU OOM
+export_legacy_format: false
+# export_hub_model_id is intentionally absent — publishing is handled by publish-model
