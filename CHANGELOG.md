@@ -1,3 +1,24 @@
+## 1.1.0 (2026-05-31)
+
+### Feat
+
+- **submit-rebuild.env.sh**: add new shell script to submit an environment rebuilding job on the goethe cluster
+- **submit-merge-and-publish.sh**: make card an optional parameter for the submit merge and publish call
+- **publish/model_card/**: make model cards dynamically injectable during publishing
+- **configs/**: add gemma3, mistral, and qwen2.5-coder configs
+- **qwen-3.5-0.8b**: add configs for qwen 3.5 0.8b using the no_think template
+- **publish/**: add lora adapter merging + huggingface publishing module as phase 4
+
+### Fix
+
+- **sumbit-rebuild-env.sh**: stop attempting to query GPUs on CPU-only node
+- **submit-rebuild.env.sh,-submit-setup.sh**: bump SLRUM time limit from 15m to 1h
+- **gemma-3**: change gemma-3-1b to gemma-3-4b to enable multimodal inpuu (the Llama Factory gemma3 template requires this)
+- **goethe/**: update merge and publish commands
+- **sumbit-merge.sh**: add version arg to submit-merge
+- **goethe/**: moved the rocm load module to be in GPU-only training nodes
+- **finetune/**: refactor to be cluster-agnostic, make llama-3.2 the new default target
+
 ## 1.0.0 (2026-05-29)
 
 ### Feat
