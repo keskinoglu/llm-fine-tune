@@ -52,7 +52,7 @@ dev = [
 # AMD / ROCm (e.g. Goethe MI210):    uv sync --extra rocm
 rocm = [
     "llm-fine-tune[finetune]",
-    "torch>=2.5; sys_platform == 'linux'",
+    "torch>=2.6; sys_platform == 'linux'",
     "torchvision; sys_platform == 'linux'",
     "torchaudio; sys_platform == 'linux'",
     "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -90,7 +90,7 @@ pytorch-triton-rocm = [{ index = "pytorch-rocm", extra = "rocm" }]
 
 [[tool.uv.index]]
 name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.2"
+url = "https://download.pytorch.org/whl/rocm6.2.4"
 explicit = true
 
 [[tool.uv.index]]

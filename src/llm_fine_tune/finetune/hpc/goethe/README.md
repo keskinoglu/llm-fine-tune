@@ -20,12 +20,21 @@ export WORK_DIR=/work/<your_group>/<your_username>
 export REPO_DIR=$WORK_DIR/llm-fine-tune
 export UV_CACHE_DIR=$WORK_DIR/.cache/uv
 export UV_LINK_MODE=hardlink
+export HF_HOME=$WORK_DIR/.cache/huggingface
 EOF
-bash -l -c 'echo "$WORK_DIR $REPO_DIR $UV_CACHE_DIR"'
+bash -l -c 'echo "$WORK_DIR $REPO_DIR $UV_CACHE_DIR $HF_HOME"'
 ```
 
-`UV_CACHE_DIR` redirects uv's cache from `~/.cache/uv` (30 GB `/home` quota) to `/work`.
+`UV_CACHE_DIR` and `HF_HOME` redirect caches from `~/.cache/` (30 GB `/home` quota) to `/work`.
+Without `HF_HOME`, large models (4B+) will exceed the home quota during download.
 `UV_LINK_MODE=hardlink` avoids redundant copies when cache and venv share the filesystem.
+
+If you set `HF_HOME` after already downloading models, move the existing cache to avoid re-downloading:
+
+```bash
+mkdir -p $WORK_DIR/.cache/huggingface
+mv ~/.cache/huggingface/hub $WORK_DIR/.cache/huggingface/hub
+```
 
 **2. Clone the repo to `$WORK_DIR`** — not `$HOME`. `/home` is capped at ~30 GB; the venv + model
 weights need ~50 GB:

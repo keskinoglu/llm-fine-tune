@@ -27,8 +27,8 @@ dependencies = [
     { name = "psutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "pyyaml", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "safetensors", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.12.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/23/60/2757c4f03a8705dbf80b1268b03881927878dca5ed07d74f733fb6c219e0/accelerate-1.11.0.tar.gz", hash = "sha256:bb1caf2597b4cd632b917b5000c591d10730bb024a79746f1ee205bba80bd229", size = 393715, upload-time = "2025-10-20T14:42:25.025Z" }
@@ -1018,15 +1018,15 @@ dependencies = [
     { name = "sentencepiece", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "sse-starlette", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "tiktoken", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.12.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torchaudio", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torchaudio", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torchaudio", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torchdata", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torchvision", version = "0.20.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torchvision", version = "0.21.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torchvision", version = "0.22.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torchvision", version = "0.27.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "transformers", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "trl", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
@@ -1058,9 +1058,9 @@ finetune = [
 rocm = [
     { name = "llamafactory", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pytorch-triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "sys_platform == 'linux'" },
-    { name = "torchaudio", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "sys_platform == 'linux'" },
-    { name = "torchvision", version = "0.20.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "sys_platform == 'linux'" },
+    { name = "torchaudio", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "sys_platform == 'linux'" },
+    { name = "torchvision", version = "0.22.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "sys_platform == 'linux'" },
 ]
 
 [package.dev-dependencies]
@@ -1081,13 +1081,13 @@ requires-dist = [
     { name = "llm-fine-tune", extras = ["finetune"], marker = "extra == 'cuda'" },
     { name = "llm-fine-tune", extras = ["finetune"], marker = "extra == 'rocm'" },
     { name = "polars", specifier = ">=1.0.0" },
-    { name = "pytorch-triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm'", specifier = ">=3.1.0", index = "https://download.pytorch.org/whl/rocm6.2", conflict = { package = "llm-fine-tune", extra = "rocm" } },
+    { name = "pytorch-triton-rocm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm'", specifier = ">=3.1.0", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'cuda'", specifier = ">=2.5", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "llm-fine-tune", extra = "cuda" } },
-    { name = "torch", marker = "sys_platform == 'linux' and extra == 'rocm'", specifier = ">=2.5", index = "https://download.pytorch.org/whl/rocm6.2", conflict = { package = "llm-fine-tune", extra = "rocm" } },
+    { name = "torch", marker = "sys_platform == 'linux' and extra == 'rocm'", specifier = ">=2.6", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
     { name = "torchaudio", marker = "sys_platform == 'linux' and extra == 'cuda'", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "llm-fine-tune", extra = "cuda" } },
-    { name = "torchaudio", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2", conflict = { package = "llm-fine-tune", extra = "rocm" } },
+    { name = "torchaudio", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
     { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'cuda'", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "llm-fine-tune", extra = "cuda" } },
-    { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2", conflict = { package = "llm-fine-tune", extra = "rocm" } },
+    { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
     { name = "transformers", specifier = ">=4.55.0" },
 ]
 provides-extras = ["rocm", "cuda", "finetune"]
@@ -1703,8 +1703,8 @@ dependencies = [
     { name = "psutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "pyyaml", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "safetensors", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.12.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "tqdm", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "transformers", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
@@ -2027,14 +2027,14 @@ wheels = [
 
 [[package]]
 name = "pytorch-triton-rocm"
-version = "3.1.0"
-source = { registry = "https://download.pytorch.org/whl/rocm6.2" }
+version = "3.3.1"
+source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }
 dependencies = [
-    { name = "filelock", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "setuptools", version = "82.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/pytorch_triton_rocm-3.1.0-cp311-cp311-linux_x86_64.whl", hash = "sha256:4b0a563986aa591ecbbfd69d53f171447f64ba453cecaafd80d853b3f1047eca", upload-time = "2024-10-17T22:54:41Z" },
-    { url = "https://download-r2.pytorch.org/whl/pytorch_triton_rocm-3.1.0-cp312-cp312-linux_x86_64.whl", hash = "sha256:3b56b87886d03dcf3aeb8f78f372f5da60b29ffdffcba5cd767b4bfdec47175b", upload-time = "2024-10-17T22:54:50Z" },
+    { url = "https://download-r2.pytorch.org/whl/pytorch_triton_rocm-3.3.1-cp311-cp311-linux_x86_64.whl", hash = "sha256:8eb26aec84408b2be3d5b942a9edef9fadc6e249afe6aab795872e227ce8f579", upload-time = "2025-06-03T22:26:32Z" },
+    { url = "https://download-r2.pytorch.org/whl/pytorch_triton_rocm-3.3.1-cp312-cp312-linux_x86_64.whl", hash = "sha256:977423eee5c542a3f8aa4f527aec1688c4d485f207089cb595a8e638fcc3888a", upload-time = "2025-06-03T22:26:30Z" },
 ]
 
 [[package]]
@@ -2383,7 +2383,7 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "mpmath", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "mpmath", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ca/99/5a5b6f19ff9f083671ddf7b9632028436167cd3d33e11015754e41b249a4/sympy-1.13.1.tar.gz", hash = "sha256:9cebf7e04ff162015ce31c9c6c9144daa34a93bd082f54fd8f12deca4f47515f", size = 7533040, upload-time = "2024-07-19T09:26:51.238Z" }
 wheels = [
@@ -2401,7 +2401,7 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform == 'darwin'",
 ]
 dependencies = [
-    { name = "mpmath", marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "mpmath", marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
@@ -2475,29 +2475,6 @@ wheels = [
 
 [[package]]
 name = "torch"
-version = "2.5.1+rocm6.2"
-source = { registry = "https://download.pytorch.org/whl/rocm6.2" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'linux'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
-]
-dependencies = [
-    { name = "filelock", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "fsspec", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "jinja2", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "networkx", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "pytorch-triton-rocm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (platform_machine != 'x86_64' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm') or (sys_platform != 'linux' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "setuptools", version = "82.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (python_full_version < '3.12' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm') or (sys_platform != 'linux' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "sympy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "typing-extensions", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-wheels = [
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torch-2.5.1%2Brocm6.2-cp311-cp311-linux_x86_64.whl", hash = "sha256:9c4c4d985923d0e31aab4108c56a1586ca599ab26abc919833b890f7f40dcc01", upload-time = "2024-10-29T23:59:56Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torch-2.5.1%2Brocm6.2-cp312-cp312-linux_x86_64.whl", hash = "sha256:80c7af931acb3941530a717aaa1d142985ae7f29b7660a72e47f1a890fc191fb", upload-time = "2024-10-30T00:03:16Z" },
-]
-
-[[package]]
-name = "torch"
 version = "2.6.0+cu124"
 source = { registry = "https://download.pytorch.org/whl/cu124" }
 resolution-markers = [
@@ -2530,6 +2507,29 @@ dependencies = [
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu124/torch-2.6.0%2Bcu124-cp311-cp311-linux_x86_64.whl", hash = "sha256:d4c3e9a8d31a7c0fcbb9da17c31a1917e1fac26c566a4cfbd8c9568ad7cade79", upload-time = "2025-01-30T00:55:01Z" },
     { url = "https://download-r2.pytorch.org/whl/cu124/torch-2.6.0%2Bcu124-cp312-cp312-linux_x86_64.whl", hash = "sha256:a393b506844035c0dac2f30ea8478c343b8e95a429f06f3b3cadfc7f53adb597", upload-time = "2025-01-30T00:57:08Z" },
+]
+
+[[package]]
+name = "torch"
+version = "2.7.1+rocm6.2.4"
+source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }
+resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "filelock", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "fsspec", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "jinja2", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "networkx", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "pytorch-triton-rocm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (platform_machine != 'x86_64' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm') or (sys_platform != 'linux' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "setuptools", version = "82.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (python_full_version < '3.12' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm') or (sys_platform != 'linux' and extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "sympy", version = "1.14.0", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "typing-extensions", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torch-2.7.1%2Brocm6.2.4-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:9b3ce5b725ea7fcdc448e291a97f78223df83c0a3938775a5cdc9923f6af109a", upload-time = "2025-06-03T18:33:18Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torch-2.7.1%2Brocm6.2.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:fd38689b185f0c384bf5863dba4f5f785cd79d814be1b45ee7ef1322d0142bfb", upload-time = "2025-06-03T18:33:41Z" },
 ]
 
 [[package]]
@@ -2570,22 +2570,6 @@ wheels = [
 
 [[package]]
 name = "torchaudio"
-version = "2.5.1+rocm6.2"
-source = { registry = "https://download.pytorch.org/whl/rocm6.2" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'linux'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
-]
-dependencies = [
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-wheels = [
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torchaudio-2.5.1%2Brocm6.2-cp311-cp311-linux_x86_64.whl", hash = "sha256:334e2c8936533c656095022d89fcb74ac23278ac88e2210b63f49c1810c88e91", upload-time = "2024-10-30T00:09:51Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torchaudio-2.5.1%2Brocm6.2-cp312-cp312-linux_x86_64.whl", hash = "sha256:63d1cfe70d8fb6154d85b5b44dbd055587828fc260c2f86cf924433ca897b917", upload-time = "2024-10-30T00:09:51Z" },
-]
-
-[[package]]
-name = "torchaudio"
 version = "2.6.0+cu124"
 source = { registry = "https://download.pytorch.org/whl/cu124" }
 resolution-markers = [
@@ -2598,6 +2582,22 @@ dependencies = [
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu124/torchaudio-2.6.0%2Bcu124-cp311-cp311-linux_x86_64.whl", hash = "sha256:b8c15d7e0e81a23630a2de552ebacfe6643990dc890f83f426e43ff62efe8651", upload-time = "2025-01-30T01:04:23Z" },
     { url = "https://download-r2.pytorch.org/whl/cu124/torchaudio-2.6.0%2Bcu124-cp312-cp312-linux_x86_64.whl", hash = "sha256:3e5ffa69606171c74f3e2b969785ead50b782ca657e746aaee1ee7cc88dcfc08", upload-time = "2025-01-30T01:04:24Z" },
+]
+
+[[package]]
+name = "torchaudio"
+version = "2.7.1+rocm6.2.4"
+source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }
+resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torchaudio-2.7.1%2Brocm6.2.4-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:f23b63a695066d842a64cbe5b8ab094cf5fe4dad163f2df255d877f55ed3231d", upload-time = "2025-06-03T18:37:43Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torchaudio-2.7.1%2Brocm6.2.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:65b308e3b13a907ffff75bfa22c026fa43bbcb9e5421f056bb48c0f1b6e60f17", upload-time = "2025-06-03T18:37:43Z" },
 ]
 
 [[package]]
@@ -2625,31 +2625,13 @@ version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-cuda') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "torch", version = "2.12.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin' or (sys_platform == 'linux' and extra != 'extra-13-llm-fine-tune-cuda' and extra != 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "urllib3", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/95/d4/af694ef718aedbe95a72760ab9ff7a6a7a44ace2d7f70c27bfeb67c5c503/torchdata-0.11.0-py3-none-any.whl", hash = "sha256:52b940fbbe0e00fb21cabddf528449d1bec5bfb0d0823b7487b15f951658ee33", size = 61968, upload-time = "2025-02-20T22:26:30.666Z" },
-]
-
-[[package]]
-name = "torchvision"
-version = "0.20.1+rocm6.2"
-source = { registry = "https://download.pytorch.org/whl/rocm6.2" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'linux'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
-]
-dependencies = [
-    { name = "numpy", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "pillow", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "torch", version = "2.5.1+rocm6.2", source = { registry = "https://download.pytorch.org/whl/rocm6.2" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-wheels = [
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torchvision-0.20.1%2Brocm6.2-cp311-cp311-linux_x86_64.whl", hash = "sha256:6026bae7d0ab1fd4767a25119c80bbe8870c45b5c7d167917b595e8972d46fce", upload-time = "2024-10-30T00:09:52Z" },
-    { url = "https://download-r2.pytorch.org/whl/rocm6.2/torchvision-0.20.1%2Brocm6.2-cp312-cp312-linux_x86_64.whl", hash = "sha256:f0e776a800cde777f865f7a71dfc9c8eaa6cc00157cc11f875d4be33ba7a7200", upload-time = "2024-10-30T00:09:53Z" },
 ]
 
 [[package]]
@@ -2668,6 +2650,24 @@ dependencies = [
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu124/torchvision-0.21.0%2Bcu124-cp311-cp311-linux_x86_64.whl", hash = "sha256:137376805aca5ba57bd2c7a3ecb8569df961dbe82b128aac9b3b0a7125ef9385", upload-time = "2025-01-30T01:04:28Z" },
     { url = "https://download-r2.pytorch.org/whl/cu124/torchvision-0.21.0%2Bcu124-cp312-cp312-linux_x86_64.whl", hash = "sha256:efb53ea0af7bf09b7b53e2a18b9be6d245f7d46a90b51d5cf97f37e9b929a991", upload-time = "2025-01-30T01:04:29Z" },
+]
+
+[[package]]
+name = "torchvision"
+version = "0.22.1+rocm6.2.4"
+source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }
+resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "numpy", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "pillow", marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.2.4", source = { registry = "https://download.pytorch.org/whl/rocm6.2.4" }, marker = "(sys_platform == 'linux' and extra == 'extra-13-llm-fine-tune-rocm') or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torchvision-0.22.1%2Brocm6.2.4-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:2b5ebaaec1c2a0fafd5b7ade30bf77156f7bc99503f78eb78727d4d28a513aa4", upload-time = "2025-06-03T18:37:32Z" },
+    { url = "https://download-r2.pytorch.org/whl/rocm6.2.4/torchvision-0.22.1%2Brocm6.2.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:d19ad0391b228d9e1fdfbe96d291918a202c675e2a6c0bc5f7a6d70713e2746b", upload-time = "2025-06-03T18:37:32Z" },
 ]
 
 [[package]]
