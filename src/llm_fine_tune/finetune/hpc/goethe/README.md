@@ -181,14 +181,22 @@ scontrol show job <JOBID> | grep StdOut
 tail -f <path/to/logfile>.out
 ```
 
-**Rebuild the entire venv from scratch** (if you need to fix a broken install):
+**Rebuild the venv after a lock-file change** (e.g. after bumping a package version locally and pushing):
+```bash
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-rebuild-env.sh
+```
+This pulls the latest `pyproject.toml` / `uv.lock` from the remote and runs `uv sync --extra rocm`.
+The log ends with the installed torch version so you can confirm the upgrade.
+
+**Wipe and rebuild the venv from scratch** (if the install is corrupt):
 ```bash
 sbatch --partition=test --nodes=1 --ntasks=1 --cpus-per-task=8 --mem=32g --time=00:30:00 \
   --output=setup_%j.out \
-  --wrap="source ~/.bashrc && cd \$REPO_DIR && uv venv --clear && uv sync --extra rocm --verbose"
+  --wrap="source ~/.bashrc && cd \$REPO_DIR && git pull && uv venv --clear && uv sync --extra rocm --verbose"
 ```
 
-**Reinstall a single package** (e.g. after fixing a version pin):
+**Reinstall a single package** (e.g. after fixing a version pin without a full rebuild):
 ```bash
 sbatch --partition=test --nodes=1 --ntasks=1 --cpus-per-task=8 --mem=16g --time=00:15:00 \
   --output=setup_%j.out \
