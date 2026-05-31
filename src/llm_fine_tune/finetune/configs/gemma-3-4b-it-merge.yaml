@@ -1,6 +1,6 @@
 ### model
-# Gemma 3 (not Gemma 2). See gemma-3-1b-it-lora.yaml for flash_attn notes.
-model_name_or_path: google/gemma-3-1b-it
+# Gemma 3 4B (multimodal). See gemma-3-4b-it-lora.yaml for notes on why 1B does not work.
+model_name_or_path: google/gemma-3-4b-it
 template: gemma3
 # adapter_name_or_path injected at runtime by the cluster job script
 
@@ -9,7 +9,7 @@ finetuning_type: lora
 
 ### export
 # export_dir injected at runtime by the cluster job script
-export_size: 5              # shard size in GB; a 1B model fits in one shard
+export_size: 5              # shard size in GB; 4B in BF16 ~8 GB → 2 shards auto-created
 export_device: cpu          # merge arithmetic on CPU — exact, no risk of GPU OOM
 export_legacy_format: false
 # export_hub_model_id is intentionally absent — publishing is handled by publish-model

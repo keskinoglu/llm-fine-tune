@@ -1,5 +1,5 @@
 ---
-base_model: google/gemma-3-1b-it
+base_model: google/gemma-3-4b-it
 license: gemma
 datasets:
   - tkeskin/leetcode-solutions
@@ -16,13 +16,13 @@ tags:
   - gemma-3
 ---
 
-# gemma-3-1b-it-code-translation
+# gemma-3-4b-it-code-translation
 
-A fine-tuned version of [google/gemma-3-1b-it](https://huggingface.co/google/gemma-3-1b-it) for translating code between **C++**, **Java**, and **Python**.
+A fine-tuned version of [google/gemma-3-4b-it](https://huggingface.co/google/gemma-3-4b-it) for translating code between **C++**, **Java**, and **Python**.
 
 ## Training
 
-- **Base model:** google/gemma-3-1b-it
+- **Base model:** google/gemma-3-4b-it
 - **Method:** LoRA (Low-Rank Adaptation) via [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
 - **Dataset:** [tkeskin/leetcode-solutions](https://huggingface.co/datasets/tkeskin/leetcode-solutions) (`instruct` config) — directed C++/Java/Python translation pairs derived from LeetCode solutions
 - **Hardware:** AMD MI210 (ROCm) / NVIDIA CUDA, `flash_attn: sdpa`
@@ -38,7 +38,7 @@ Given source code in one of C++, Java, or Python, the model generates a translat
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-model_id = "tkeskin/gemma-3-1b-it-code-translation"
+model_id = "tkeskin/gemma-3-4b-it-code-translation"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id)
 

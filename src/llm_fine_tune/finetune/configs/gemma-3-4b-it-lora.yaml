@@ -1,8 +1,10 @@
 ### model
 # Gemma 3 (this file) respects flash_attn: sdpa.
 # Gemma 2 silently forces FA2 regardless of this setting — do not use this config for Gemma 2.
-# Requires accepting the Gemma license on huggingface.co/google/gemma-3-1b-it before your token works.
-model_name_or_path: google/gemma-3-1b-it
+# LLaMA-Factory's gemma3 template requires a multimodal image processor. Only the 4B+ models
+# ship with one; the 1B (gemma3_text) is text-only and will crash with "Processor was not found".
+# Requires accepting the Gemma license on huggingface.co/google/gemma-3-4b-it before your token works.
+model_name_or_path: google/gemma-3-4b-it
 template: gemma3
 flash_attn: sdpa
 
