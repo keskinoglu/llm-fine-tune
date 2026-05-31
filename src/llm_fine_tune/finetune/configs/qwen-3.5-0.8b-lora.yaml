@@ -1,0 +1,41 @@
+### model
+model_name_or_path: Qwen/Qwen3.5-0.8B
+template: qwen3_5_nothink
+# sdpa runs on AMD ROCm and NVIDIA CUDA alike — no flash-attn library needed.
+# Change to fa2 only if flash-attn is installed and you are on Ampere+ (sm_80+).
+# Qwen3.5 respects flash_attn: sdpa (unlike gpt_oss / gemma2 which override it).
+flash_attn: sdpa
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+
+### dataset
+# resolved via dataset_dir injected by the cluster job script at runtime
+dataset: leetcode_instruct
+cutoff_len: 2048
+preprocessing_num_workers: 8
+
+### precision
+# bf16 works on AMD MI210 and NVIDIA Ampere+ (compute capability >= 8.0, e.g. A100/H100).
+# For older NVIDIA GPUs (e.g. V100, sm_70): set bf16: false and fp16: true.
+bf16: true
+
+### training hyperparameters
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+logging_steps: 10
+save_steps: 200
+plot_loss: true
+
+### multi-GPU coordination
+ddp_timeout: 180000000
+
+### output
+# output_dir is NOT set here — injected by the cluster job script at runtime.
