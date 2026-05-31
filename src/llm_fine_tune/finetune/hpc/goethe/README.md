@@ -132,11 +132,7 @@ publish-model \
     --message "10-step smoke test"
 ```
 
-`--card` selects a pre-written model card from `src/llm_fine_tune/publish/model_card/<name>.md`.
-Available cards: `llama-3.2-1b`, `qwen-3.5-0.8b`, `gemma-3-1b-it`, `mistral-7b-v0.3`, `qwen2.5-coder-1.5b`.
-Omit `--card` to skip injecting a card entirely.
-
-**3. Merge and publish** — all five arguments are required; the job fails immediately if any are missing:
+**3. Merge and publish** — first five arguments required, sixth (card) optional:
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge-and-publish.sh \
@@ -144,10 +140,9 @@ sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge-and-publish.sh \
     "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
     tkeskin/llama-3.2-1b-instruct-code-translation \
     v0.1 \
-    "10-step smoke test"
+    "10-step smoke test" \
+    llama-3.2-1b
 ```
-
-Add `--card llama-3.2-1b` (or the appropriate model name) to the `publish-model` call inside the job log if you want the card injected during the combined job. For the separate publish step above, pass it directly.
 
 Monitor any of these jobs with:
 ```bash

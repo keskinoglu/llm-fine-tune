@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merge a LoRA adapter into the base model AND publish to HuggingFace.
-# All arguments are required. To do steps separately:
+# Args 1-5 are required; arg 6 (card) is optional. To do steps separately:
 #   merge only:   submit-merge.sh
 #   publish only: publish-model --help
 #
@@ -11,7 +11,8 @@
 #       "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
 #       tkeskin/llama-3.2-1b-instruct-code-translation \
 #       v0.1 \
-#       "10-step smoke test"
+#       "10-step smoke test" \
+#       llama-3.2-1b
 #
 # Required env vars (set in ~/.bashrc):
 #   WORK_DIR  — e.g. /work/<group>/<user>
@@ -46,9 +47,10 @@ TAG="${4:?
   Missing: tag  (e.g. v0.1)
 }"
 MESSAGE="${5:?
-  Usage: sbatch submit-merge-and-publish.sh <config> <adapter_dir> <repo_id> <tag> <message>
+  Usage: sbatch submit-merge-and-publish.sh <config> <adapter_dir> <repo_id> <tag> <message> [card]
   Missing: message  (e.g. \"10-step smoke test\")
 }"
+CARD="${6:-}"
 
 module load rocm/6.2.4
 source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/goethe/env.sh"
@@ -66,4 +68,5 @@ publish-model \
     --model-dir "$EXPORT_DIR" \
     --repo-id "$REPO_ID" \
     --tag "$TAG" \
-    --message "$MESSAGE"
+    --message "$MESSAGE" \
+    ${CARD:+--card "$CARD"}
