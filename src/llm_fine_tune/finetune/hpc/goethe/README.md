@@ -111,39 +111,44 @@ those deltas into the base model weights to produce a self-contained model you c
 (sufficient for downloading the gated Llama model). Pushing a model requires write access to
 `tkeskin/` repos. If the push returns 401/403, re-run `hf auth login` with a write-scoped token.
 
-**Merge + publish in one job:**
+Three separate commands — use the one that fits:
+
+**1. Merge only** — fuses the adapter into the base model, writes to `$WORK_DIR/exports/<run>/`:
 ```bash
 cd "$REPO_DIR"
-sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
-    "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
-    tkeskin/llama-3.2-1b-instruct-code-translation
-```
-
-Monitor:
-```bash
-tail -f merge_*.out
-```
-
-The job saves the merged model to `$WORK_DIR/exports/<run-name>/`, then uploads it. On success
-the log ends with `Done! https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation`.
-
-**Merge only (publish manually later):** omit the repo id argument:
-```bash
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
     src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
     "$WORK_DIR/saves/test-llama-3.2-1b-lora"
 ```
 
-Then publish (or re-publish with a new commit message / version tag) directly:
+**2. Publish only** — uploads an already-merged directory to HuggingFace (run from login node after activating the venv):
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
 publish-model \
     --model-dir "$WORK_DIR/exports/test-llama-3.2-1b-lora" \
     --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
-    --message "Add fully trained v1" \
-    --tag v1
+    --tag v0.1 \
+    --message "10-step smoke test"
 ```
+
+**3. Merge and publish** — all five arguments are required; the job fails immediately if any are missing:
+```bash
+cd "$REPO_DIR"
+sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge-and-publish.sh \
+    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
+    "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
+    tkeskin/llama-3.2-1b-instruct-code-translation \
+    v0.1 \
+    "10-step smoke test"
+```
+
+Monitor any of these jobs with:
+```bash
+tail -f merge_*.out        # submit-merge.sh
+tail -f merge_publish_*.out  # submit-merge-and-publish.sh
+```
+
+On success the log ends with `Done! https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation`.
 
 ---
 
