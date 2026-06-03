@@ -8,8 +8,13 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-$(dirname "$REPO_DIR")/.cache/uv}"
 export UV_LINK_MODE=hardlink
 mkdir -p "$UV_CACHE_DIR"
 
-# HuggingFace defaults to ~/.cache/huggingface which may not exist on compute nodes.
+# HuggingFace cache. HF_HOME (model weights + downloaded dataset files) stays on /work so
+# nothing re-downloads between jobs.
 export HF_HOME="${HF_HOME:-$(dirname "$REPO_DIR")/.cache/huggingface}"
 mkdir -p "$HF_HOME"
+
+# PanFS doesn't honor fcntl.flock() under concurrency; use node-local storage for dataset locks.
+export HF_DATASETS_CACHE="${SLURM_TMPDIR:-${TMPDIR:-/tmp}}/hf-datasets-${SLURM_JOB_ID:-$$}"
+mkdir -p "$HF_DATASETS_CACHE"
 
 export FINETUNE_EXTRA=rocm
