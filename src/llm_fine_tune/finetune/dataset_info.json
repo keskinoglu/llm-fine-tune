@@ -1,7 +1,18 @@
 {
-  "leetcode_instruct": {
+  "leetcode_instruct_train": {
     "hf_hub_url": "tkeskin/leetcode-solutions",
     "subset": "instruct",
+    "split": "train",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  },
+  "leetcode_instruct_test": {
+    "hf_hub_url": "tkeskin/leetcode-solutions",
+    "subset": "instruct",
+    "split": "test",
     "columns": {
       "prompt": "instruction",
       "query": "input",

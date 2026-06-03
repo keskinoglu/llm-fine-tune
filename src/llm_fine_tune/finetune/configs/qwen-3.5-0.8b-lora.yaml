@@ -14,7 +14,10 @@ lora_target: all
 
 ### dataset
 # resolved via dataset_dir injected by the cluster job script at runtime
-dataset: leetcode_instruct
+# train on held-out split; to train on all data use:
+# dataset: leetcode_instruct_train,leetcode_instruct_test
+dataset: leetcode_instruct_train
+eval_dataset: leetcode_instruct_test
 cutoff_len: 2048
 preprocessing_num_workers: 8
 

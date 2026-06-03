@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: help lint lf commit cz bump base instruct dataset clean-data upload publish fertility finetune-sync
+.PHONY: help lint lf commit cz bump base instruct dataset clean-data upload publish fertility finetune-sync test
 
 help:
 	@echo "Available commands:"
@@ -10,12 +10,13 @@ help:
 	@echo "  make commit          Run lint checks, then create a commitizen commit"
 	@echo "  make cz              Alias for 'make commit'"
 	@echo "  make bump            Bump the project version using commitizen"
-	@echo "  make base            Clone walkccc/LeetCode (if needed) and build the base Parquet dataset"
-	@echo "  make instruct        Build the instruct Parquet dataset from the base dataset"
+	@echo "  make base            Build and enrich the base Parquet dataset (--pull to update walkccc, --refresh to re-download HF sources)"
+	@echo "  make instruct        Build instruct-train.parquet and instruct-test.parquet (70/30 split) from base"
 	@echo "  make dataset         Build both the base and instruct datasets"
 	@echo "  make clean-data      Remove the cloned source repo and generated output"
-	@echo "  make upload          Upload existing Parquet files + dataset card to HuggingFace"
+	@echo "  make upload          Upload base + instruct-train + instruct-test + dataset card to HuggingFace"
 	@echo "  make publish         Build both datasets, then upload them (dataset + upload)"
+	@echo "  make test            Run unit tests (splits, newfacade matching)"
 	@echo "  make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt"
 	@echo "  make finetune-sync   Rsync the finetune/ configs and scripts to the cluster (requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env)"
 
@@ -51,6 +52,9 @@ upload:
 	uv run python -m llm_fine_tune.dataset.upload_dataset
 
 publish: dataset upload
+
+test:
+	uv run pytest
 
 fertility:
 	uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility
