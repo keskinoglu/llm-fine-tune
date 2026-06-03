@@ -1,3 +1,11 @@
+"""Local caching layer for external data sources.
+
+Provides two primitives: cloning/updating a git repository to a local directory,
+and downloading an HuggingFace dataset to a local Parquet file. Both skip the
+network on subsequent runs; pass the relevant refresh/update flag to force
+a fresh fetch.
+"""
+
 from __future__ import annotations
 
 import subprocess
@@ -27,9 +35,9 @@ def load_hf_dataset_cached(
     *,
     refresh: bool = False,
 ) -> pl.DataFrame:
-    """Return a Polars DataFrame from an HF dataset, using cache_path as a local parquet cache.
+    """Return a Polars DataFrame from an HF dataset, using cache_path as a local Parquet cache.
 
-    Downloads all splits and caches them on first use; reads from the local parquet on
+    Downloads all splits and caches them on first use; reads from the local Parquet on
     subsequent calls. Pass refresh=True to force a fresh download regardless of cache state.
     The full dataset is cached so column selection can vary between calls without re-downloading.
     """
@@ -38,10 +46,10 @@ def load_hf_dataset_cached(
         return pl.read_parquet(cache_path)
 
     print(f"Downloading {repo_id} ...")
-    from datasets import concatenate_datasets, load_dataset  # isolated import
+    from datasets import concatenate_datasets, load_dataset
 
-    ds = load_dataset(repo_id)
-    frame = concatenate_datasets(list(ds.values())).to_polars()
+    dataset = load_dataset(repo_id)
+    frame = concatenate_datasets(list(dataset.values())).to_polars()
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(cache_path, compression="zstd")

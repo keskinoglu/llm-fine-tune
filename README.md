@@ -25,21 +25,31 @@ ds = load_dataset("tkeskin/leetcode-solutions", "instruct")
 
 ### `base`
 
-Each row is one LeetCode problem. Language columns contain the solution source code and are `null` when no solution exists for that language.
+Each row is one LeetCode problem. Language columns contain the solution source code and are `null` when no solution exists for that language. Metadata columns are `null` for problems not present in the secondary source.
 
-| Column       | Type   | Description                        |
-|--------------|--------|------------------------------------|
-| `problem_id` | int64  | LeetCode problem number            |
-| `title`      | string | Problem title                      |
-| `cpp`        | string | C++ solution (~3,495 problems)     |
-| `java`       | string | Java solution (~3,371 problems)    |
-| `python`     | string | Python solution (~3,169 problems)  |
-| `sql`        | string | SQL solution (~307 problems)       |
-| `typescript` | string | TypeScript solution (~69 problems) |
+| Column                | Type   | Description                                           |
+|-----------------------|--------|-------------------------------------------------------|
+| `problem_id`          | int64  | LeetCode problem number                               |
+| `title`               | string | Problem title                                         |
+| `cpp`                 | string | C++ solution (~3,495 problems)                        |
+| `java`                | string | Java solution (~3,371 problems)                       |
+| `python`              | string | Python solution (~3,169 problems)                     |
+| `sql`                 | string | SQL solution (~307 problems)                          |
+| `typescript`          | string | TypeScript solution (~69 problems)                    |
+| `difficulty`          | string | `Easy`, `Medium`, or `Hard`                           |
+| `input_output`        | list   | `[{"input": ..., "output": ...}]` test case pairs     |
+| `problem_description` | string | Full problem statement                                |
+| `entry_point`         | string | Function/method name to implement                     |
+| `prompt`              | string | Prompt template variant                               |
+| `query`               | string | Full problem prompt with context                      |
+| `response`            | string | Reference explanation/response                        |
+| `tags`                | list   | Topic tags (e.g. `["Array", "Hash Table"]`)           |
+| `estimated_date`      | date   | Problem publication date                              |
+| `task_id`             | string | URL slug identifier (e.g. `two-sum`)                  |
 
 ### `instruct`
 
-Derived from `base`. Each row is a directed code-translation pair between C++, Java, and Python (Python→Java and Java→Python are separate rows).
+Derived from `base`. Each row is a directed code-translation pair between C++, Java, and Python (Python→Java and Java→Python are separate rows). Split 70/30 at problem granularity — all translation pairs for a given problem land on the same side, preventing train/test leakage.
 
 | Column        | Type   | Description                                    |
 |---------------|--------|------------------------------------------------|
@@ -130,7 +140,7 @@ Before fine-tuning, compare how efficiently candidate HuggingFace models tokeniz
 
 Tokenizer fertility measures how efficiently a tokenizer encodes text. Lower `tokens_per_word` and higher `bytes_per_token` mean better compression — especially important for code-heavy datasets.
 
-Run the evaluation against `output/leetcode-instruct.parquet` (build it first with `make instruct`):
+Run the evaluation against the full instruct dataset — `output/leetcode-instruct-train.parquet` and `output/leetcode-instruct-test.parquet` concatenated (build them first with `make instruct`):
 
 ```bash
 make fertility

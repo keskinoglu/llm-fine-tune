@@ -2,7 +2,7 @@
 
 This directory contains everything needed to fine-tune a model using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on an HPC cluster.
 
-The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)** with **LoRA** on the `leetcode_instruct` dataset.
+The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)** with **LoRA** on the `leetcode_instruct_train` dataset, holding out `leetcode_instruct_test` for evaluation.
 
 ---
 
@@ -94,8 +94,10 @@ Drop a YAML in `configs/` and pass its path to the cluster's submit script. Comm
 ## How `dataset_info.json` works
 
 LLaMA-Factory resolves datasets via the `dataset_dir` argument. Each job script points this at
-`src/llm_fine_tune/finetune/`, where `dataset_info.json` lives. The entry there pulls
-`leetcode_instruct` directly from HuggingFace Hub at job start — no manual data copying.
+`src/llm_fine_tune/finetune/`, where `dataset_info.json` lives. The entries there pull
+`leetcode_instruct_train` and `leetcode_instruct_test` directly from HuggingFace Hub at job start
+— no manual data copying. By default configs train on `leetcode_instruct_train` and evaluate on
+`leetcode_instruct_test`; to train on everything, set `dataset: leetcode_instruct_train,leetcode_instruct_test`.
 
 ---
 
