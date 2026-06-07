@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: help lint lf commit cz bump base instruct dataset clean-data upload publish fertility finetune-sync test
+.PHONY: help lint lf commit cz bump base instruct evaluation dataset clean-data upload publish fertility finetune-sync test
 
 help:
 	@echo "Available commands:"
@@ -12,7 +12,8 @@ help:
 	@echo "  make bump            Bump the project version using commitizen"
 	@echo "  make base            Build and enrich the base Parquet dataset (--pull to update walkccc, --refresh to re-download HF sources)"
 	@echo "  make instruct        Build instruct-train.parquet and instruct-test.parquet (70/30 split) from base"
-	@echo "  make dataset         Build both the base and instruct datasets"
+	@echo "  make evaluation      Build leetcode-evaluation.parquet (held-out bigcode_task_payloads) from base"
+	@echo "  make dataset         Build base, instruct, and evaluation datasets"
 	@echo "  make clean-data      Remove the cloned source repo and generated output"
 	@echo "  make upload          Upload base + instruct-train + instruct-test + dataset card to HuggingFace"
 	@echo "  make publish         Build both datasets, then upload them (dataset + upload)"
@@ -43,7 +44,10 @@ base:
 instruct:
 	uv run python -m llm_fine_tune.dataset.build_instruct_dataset
 
-dataset: base instruct
+evaluation:
+	uv run python -m llm_fine_tune.dataset.build_evaluation_dataset
+
+dataset: base instruct evaluation
 
 clean-data:
 	rm -rf data/ output/

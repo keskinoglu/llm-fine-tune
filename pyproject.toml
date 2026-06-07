@@ -19,9 +19,12 @@ dependencies = [
 [project.scripts]
 build-base-dataset = "llm_fine_tune.dataset.build_base_dataset:main"
 build-instruct-dataset = "llm_fine_tune.dataset.build_instruct_dataset:main"
+build-evaluation-dataset = "llm_fine_tune.dataset.build_evaluation_dataset:main"
 publish-dataset = "llm_fine_tune.dataset.upload_dataset:main"
 publish-model = "llm_fine_tune.publish.upload_model:main"
 analyze-tokenizer-fertility = "llm_fine_tune.tokenizer.analyze_tokenizer_fertility:main"
+run-bigcode-cli = "llm_fine_tune.evaluation.run_bigcode_cli:main"
+evaluation-report = "llm_fine_tune.evaluation.report:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -68,6 +71,11 @@ cuda = [
 # Shared finetune stack — pulled in by both rocm and cuda above.
 finetune = [
     "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git",
+]
+# Evaluation stack. Install on Goethe only (bigcode-eval pulls heavy deps).
+# Pin the commit after Milestone 3 setup is verified on the cluster.
+evaluation = [
+    "bigcode-eval @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git",
 ]
 
 [tool.uv]

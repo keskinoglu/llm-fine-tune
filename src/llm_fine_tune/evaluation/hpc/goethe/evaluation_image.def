@@ -14,8 +14,9 @@ From: ghcr.io/bigcode-project/evaluation-harness-multiple
 
 %post
     # Install the llm-fine-tune package (core + evaluation extra) so the
-    # evaluation modules are importable inside the container.
-    pip install --no-cache-dir /opt/llm-fine-tune[evaluation]
+    # evaluation modules (execution, score, report) are importable inside
+    # the container. bigcode-eval is already present in the base image.
+    pip install --no-cache-dir /opt/llm-fine-tune
 
 %files
     # Copy the repo into the image so pip install has a local source tree.
