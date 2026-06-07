@@ -448,7 +448,7 @@ def _java_literal(value: object) -> str:
         elem = value[0]
         elem_type = _java_type(elem)
         elements = ", ".join(_java_literal(v) for v in value)
-        return f"new {elem_type}{{{elements}}}"
+        return f"new {elem_type}[]{{{elements}}}"
     raise UnsupportedInputOutputValue(
         f"No Java literal for {type(value).__name__!r}: {value!r}"
     )
