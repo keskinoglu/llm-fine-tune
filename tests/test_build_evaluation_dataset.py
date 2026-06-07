@@ -17,6 +17,8 @@ from llm_fine_tune.dataset.build_evaluation_dataset import (
     _java_literal,
     _java_type,
     _parse_input_output_pairs,
+    _parse_named_param_string,
+    _parse_value_string,
 )
 from llm_fine_tune.dataset.build_instruct_dataset import (
     DEFAULT_SPLIT_SEED as INSTRUCT_SPLIT_SEED,
@@ -73,6 +75,90 @@ def test_parse_inputs_plural_form():
     raw = json.dumps({"inputs": [[5]], "outputs": [25]})
     pairs = _parse_input_output_pairs(raw)
     assert pairs == [{"input": [5], "expected": 25}]
+
+
+def test_parse_named_param_list_polars_format():
+    """Primary real-data format: Polars delivers this column as list[dict], not a string."""
+    raw = [
+        {"input": "nums1 = [100,200,300], nums2 = [150,250,350]", "output": "225.0"},
+    ]
+    pairs = _parse_input_output_pairs(raw)
+    assert pairs == [{"input": [[100, 200, 300], [150, 250, 350]], "expected": 225.0}]
+
+
+def test_parse_named_param_single_arg():
+    raw = [{"input": "n = 5", "output": "120"}]
+    pairs = _parse_input_output_pairs(raw)
+    assert pairs == [{"input": [5], "expected": 120}]
+
+
+def test_parse_named_param_string_output():
+    raw = [{"input": 'target = "hello"', "output": '"world"'}]
+    pairs = _parse_input_output_pairs(raw)
+    assert pairs == [{"input": ["hello"], "expected": "world"}]
+
+
+def test_parse_named_param_multiple_cases():
+    raw = [
+        {"input": "target = 3", "output": "True"},
+        {"input": "target = 7", "output": "False"},
+    ]
+    pairs = _parse_input_output_pairs(raw)
+    assert pairs == [
+        {"input": [3], "expected": True},
+        {"input": [7], "expected": False},
+    ]
+
+
+# ---------------------------------------------------------------------------
+# _parse_named_param_string
+# ---------------------------------------------------------------------------
+
+
+def test_named_param_string_multiple_params():
+    values = _parse_named_param_string("nums = [1,2,3], target = 9")
+    assert values == [[1, 2, 3], 9]
+
+
+def test_named_param_string_single_param():
+    values = _parse_named_param_string("n = 42")
+    assert values == [42]
+
+
+def test_named_param_string_nested_list_not_split_at_inner_comma():
+    values = _parse_named_param_string("matrix = [[1,2],[3,4]], k = 2")
+    assert values == [[[1, 2], [3, 4]], 2]
+
+
+# ---------------------------------------------------------------------------
+# _parse_value_string
+# ---------------------------------------------------------------------------
+
+
+def test_parse_value_string_int():
+    assert _parse_value_string("42") == 42
+
+
+def test_parse_value_string_float():
+    assert _parse_value_string("225.0") == 225.0
+
+
+def test_parse_value_string_list():
+    assert _parse_value_string("[1,2,3]") == [1, 2, 3]
+
+
+def test_parse_value_string_quoted_string():
+    assert _parse_value_string('"hello"') == "hello"
+
+
+def test_parse_value_string_bool():
+    assert _parse_value_string("True") is True
+    assert _parse_value_string("False") is False
+
+
+def test_parse_value_string_unparseable_raises():
+    with pytest.raises(UnsupportedInputOutputValue):
+        _parse_value_string("{not: valid}")
 
 
 # ---------------------------------------------------------------------------
