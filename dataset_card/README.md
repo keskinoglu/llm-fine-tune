@@ -21,6 +21,10 @@ configs:
     path: leetcode-instruct-train.parquet
   - split: test
     path: leetcode-instruct-test.parquet
+- config_name: evaluation
+  data_files:
+  - split: test
+    path: leetcode-evaluation.parquet
 ---
 
 # LeetCode Solutions
@@ -55,7 +59,7 @@ ds = load_dataset("tkeskin/leetcode-solutions", "base")
 
 | Column              | Type   | Description                                                   |
 |---------------------|--------|---------------------------------------------------------------|
-| `problem_id`        | int64  | LeetCode problem number                                       |
+| `code_snippet_id`   | int64  | LeetCode problem number                                       |
 | `title`             | string | Problem title                                                 |
 | `cpp`               | string | C++ solution (~3,495 problems)                                |
 | `java`              | string | Java solution (~3,371 problems)                               |
@@ -101,6 +105,35 @@ full = concatenate_datasets([ds["train"], ds["test"]])
 | `instruction` | Natural-language instruction (randomly varied)      |
 | `input`       | Source code to translate from                       |
 | `output`      | Target code to translate to                         |
+
+### `evaluation`
+
+Held-out code-translation payloads for evaluating fine-tuned models via
+[bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness).
+Each row is one directed translation pair (e.g. Python→C++) from the 30 % test split,
+enriched with a per-language `execution_engine` that compiles and runs a translation
+against the snippet's known input/output pairs.
+
+Only the test split is published (train rows are in the `instruct` config). The split
+boundary is identical to `instruct` — all pairs for a given snippet land on the same side.
+
+```python
+from datasets import load_dataset
+ds = load_dataset("tkeskin/leetcode-solutions", "evaluation")
+rows = ds["test"]
+```
+
+| Column                                | Type   | Description                                                        |
+|---------------------------------------|--------|--------------------------------------------------------------------|
+| `code_snippet_id`                     | int64  | LeetCode problem number (matches `base`)                           |
+| `source_language`                     | string | Language of the code to translate from (`cpp`, `java`, `python`)   |
+| `target_language`                     | string | Language to translate to (`cpp`, `java`, `python`)                 |
+| `user_prompt`                         | string | Natural-language instruction asking for the translation            |
+| `code_snippet_to_translate`           | string | Source-language code given to the model                            |
+| `expected_code_snippet_translation`   | string | Gold target-language translation (oracle-verified)                 |
+| `execution_engine`                    | string | Target-language driver code that runs a translation on test inputs |
+| `expected_input_output_pairs`         | string | JSON-encoded `[{"input": [...], "expected": value}, ...]`          |
+| `difficulty`                          | string | Problem difficulty: `Easy`, `Medium`, or `Hard`                    |
 
 ## License
 
