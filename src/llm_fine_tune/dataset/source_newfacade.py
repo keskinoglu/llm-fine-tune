@@ -46,7 +46,7 @@ def load_newfacade_frame(*, refresh: bool = False) -> pl.DataFrame:
         _REPO_ID, _CACHE_PATH, refresh=refresh
     )
     return full_frame.select(["question_id"] + MERGE_COLUMNS).rename(
-        {"question_id": "problem_id"}
+        {"question_id": "code_snippet_id"}
     )
 
 
@@ -63,7 +63,7 @@ def slugify(title: str) -> str:
     return slug.strip("-")
 
 
-def unmatched_problem_ids(
+def unmatched_code_snippet_ids(
     base_ids: set[int],
     newfacade_ids: set[int],
 ) -> tuple[set[int], set[int]]:
@@ -76,14 +76,14 @@ def title_mismatches(
     newfacade_frame: pl.DataFrame,
 ) -> list[dict]:
     """Return matched rows where slugify(base.title) != newfacade.task_id."""
-    joined = base_frame.select(["problem_id", "title"]).join(
-        newfacade_frame.select(["problem_id", "task_id"]),
-        on="problem_id",
+    joined = base_frame.select(["code_snippet_id", "title"]).join(
+        newfacade_frame.select(["code_snippet_id", "task_id"]),
+        on="code_snippet_id",
         how="inner",
     )
     return [
         {
-            "problem_id": row["problem_id"],
+            "code_snippet_id": row["code_snippet_id"],
             "base_title": row["title"],
             "task_id": row["task_id"],
         }

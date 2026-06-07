@@ -44,21 +44,21 @@ def main() -> None:
     instruct_frame = _build_instruct_frame(instruct_rows)
 
     print(
-        f"Splitting by problem (test_frac={args.test_frac}, split_seed={args.split_seed}) ..."
+        f"Splitting by code_snippet (test_frac={args.test_frac}, split_seed={args.split_seed}) ..."
     )
     train_frame, test_frame = splits.split_by_key(
-        instruct_frame, "problem_id", args.test_frac, args.split_seed
+        instruct_frame, "code_snippet_id", args.test_frac, args.split_seed
     )
 
-    n_train_problems = train_frame["problem_id"].n_unique()
-    n_test_problems = test_frame["problem_id"].n_unique()
+    n_train_snippets = train_frame["code_snippet_id"].n_unique()
+    n_test_snippets = test_frame["code_snippet_id"].n_unique()
 
-    train_frame = train_frame.drop("problem_id")
-    test_frame = test_frame.drop("problem_id")
+    train_frame = train_frame.drop("code_snippet_id")
+    test_frame = test_frame.drop("code_snippet_id")
 
     loaders.write_parquet(train_frame, INSTRUCT_TRAIN_PATH)
     loaders.write_parquet(test_frame, INSTRUCT_TEST_PATH)
-    _print_summary(train_frame, test_frame, n_train_problems, n_test_problems)
+    _print_summary(train_frame, test_frame, n_train_snippets, n_test_snippets)
 
 
 # ---- Argument parsing ----
@@ -97,15 +97,15 @@ def _collect_instruct_rows(
 ) -> list[dict]:
     directed_pairs = list(itertools.permutations(INSTRUCT_LANGUAGES, 2))
     rows = []
-    for problem in base_frame.iter_rows(named=True):
+    for code_snippet in base_frame.iter_rows(named=True):
         for source_language, target_language in directed_pairs:
-            source_code = problem[source_language]
-            target_code = problem[target_language]
+            source_code = code_snippet[source_language]
+            target_code = code_snippet[target_language]
             if source_code is None or target_code is None:
                 continue
             rows.append(
                 _build_instruct_row(
-                    problem_id=problem["problem_id"],
+                    code_snippet_id=code_snippet["code_snippet_id"],
                     source_language=source_language,
                     target_language=target_language,
                     source_code=source_code,
@@ -118,7 +118,7 @@ def _collect_instruct_rows(
 
 def _build_instruct_row(
     *,
-    problem_id: int,
+    code_snippet_id: int,
     source_language: str,
     target_language: str,
     source_code: str,
@@ -126,7 +126,7 @@ def _build_instruct_row(
     instruction_rng: random.Random,
 ) -> dict:
     return {
-        "problem_id": problem_id,
+        "code_snippet_id": code_snippet_id,
         "instruction": generate_instruction(
             source_language, target_language, instruction_rng
         ),
@@ -137,7 +137,7 @@ def _build_instruct_row(
 
 def _build_instruct_frame(rows: list[dict]) -> pl.DataFrame:
     schema = {
-        "problem_id": pl.Int64,
+        "code_snippet_id": pl.Int64,
         "instruction": pl.Utf8,
         "input": pl.Utf8,
         "output": pl.Utf8,
@@ -151,13 +151,13 @@ def _build_instruct_frame(rows: list[dict]) -> pl.DataFrame:
 def _print_summary(
     train_frame: pl.DataFrame,
     test_frame: pl.DataFrame,
-    n_train_problems: int,
-    n_test_problems: int,
+    n_train_snippets: int,
+    n_test_snippets: int,
 ) -> None:
     print(
         f"\nSaved instruct dataset:"
-        f"\n  train: {train_frame.height:,} rows ({n_train_problems:,} problems) → {INSTRUCT_TRAIN_PATH}"
-        f"\n  test:  {test_frame.height:,} rows ({n_test_problems:,} problems)  → {INSTRUCT_TEST_PATH}"
+        f"\n  train: {train_frame.height:,} rows ({n_train_snippets:,} code snippets) → {INSTRUCT_TRAIN_PATH}"
+        f"\n  test:  {test_frame.height:,} rows ({n_test_snippets:,} code snippets)  → {INSTRUCT_TEST_PATH}"
     )
 
 

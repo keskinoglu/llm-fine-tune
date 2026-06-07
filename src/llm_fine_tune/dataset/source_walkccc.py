@@ -32,21 +32,21 @@ _PROBLEM_FOLDER_PATTERN = re.compile(r"^(\d+)\. (.+)$")
 
 
 def load_walkccc_frame(*, pull: bool = False) -> pl.DataFrame:
-    """Return a problem_id-keyed frame with one column per language solution.
+    """Return a code_snippet_id-keyed frame with one column per language solution.
 
     Clones the source repository on first call; pass pull=True to update it.
     """
     source_cache.ensure_git_repo(SOURCE_REPO_URL, SOURCE_REPO_DIR, update=pull)
     print("Scanning solutions ...")
-    rows = _collect_problem_rows()
-    print(f"Building dataset from {len(rows):,} problems ...")
+    rows = _collect_code_snippet_rows()
+    print(f"Building dataset from {len(rows):,} code snippets ...")
     return _build_walkccc_frame(rows)
 
 
-# ---- Internal helpers (scan → row per problem → typed frame) ----
+# ---- Internal helpers (scan → row per code snippet → typed frame) ----
 
 
-def _collect_problem_rows() -> list[dict]:
+def _collect_code_snippet_rows() -> list[dict]:
     rows = []
     for folder in sorted(SOLUTIONS_DIR.iterdir()):
         if not folder.is_dir():
@@ -55,8 +55,8 @@ def _collect_problem_rows() -> list[dict]:
         if parsed is None:
             print(f"  Skipping unexpected folder: {folder.name}")
             continue
-        problem_id, title = parsed
-        rows.append(_build_problem_row(folder, problem_id, title))
+        code_snippet_id, title = parsed
+        rows.append(_build_code_snippet_row(folder, code_snippet_id, title))
     return rows
 
 
@@ -67,22 +67,24 @@ def _parse_problem_folder(folder_name: str) -> tuple[int, str] | None:
     return int(match.group(1)), match.group(2)
 
 
-def _build_problem_row(folder: Path, problem_id: int, title: str) -> dict:
-    row: dict = {"problem_id": problem_id, "title": title}
+def _build_code_snippet_row(folder: Path, code_snippet_id: int, title: str) -> dict:
+    row: dict = {"code_snippet_id": code_snippet_id, "title": title}
     for extension, language_column in EXTENSION_TO_LANGUAGE_COLUMN.items():
-        row[language_column] = _read_solution_file(folder, problem_id, extension)
+        row[language_column] = _read_solution_file(folder, code_snippet_id, extension)
     return row
 
 
-def _read_solution_file(folder: Path, problem_id: int, extension: str) -> str | None:
-    path = folder / f"{problem_id}.{extension}"
+def _read_solution_file(
+    folder: Path, code_snippet_id: int, extension: str
+) -> str | None:
+    path = folder / f"{code_snippet_id}.{extension}"
     return path.read_text(encoding="utf-8") if path.exists() else None
 
 
 def _build_walkccc_frame(rows: list[dict]) -> pl.DataFrame:
     schema = {
-        "problem_id": pl.Int64,
+        "code_snippet_id": pl.Int64,
         "title": pl.Utf8,
         **{column: pl.Utf8 for column in LANGUAGE_COLUMNS},
     }
-    return pl.DataFrame(rows, schema=schema).sort("problem_id")
+    return pl.DataFrame(rows, schema=schema).sort("code_snippet_id")
