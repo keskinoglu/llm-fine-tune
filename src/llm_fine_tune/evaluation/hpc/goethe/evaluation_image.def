@@ -1,0 +1,26 @@
+# Apptainer build recipe for the evaluation container.
+#
+# Extends the MultiPL-E toolchain image (which has g++, javac, java, python3)
+# with the llm-fine-tune package so the evaluation core is importable.
+#
+# Build (on a node with internet access, from $REPO_DIR):
+#   apptainer build "$WORK_DIR/images/evaluation.sif" \
+#       src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def
+#
+# The container is --net none at run time (no outbound network during execution).
+
+Bootstrap: docker
+From: ghcr.io/bigcode-project/evaluation-harness-multiple
+
+%post
+    # Install the llm-fine-tune package (core + evaluation extra) so the
+    # evaluation modules are importable inside the container.
+    pip install --no-cache-dir /opt/llm-fine-tune[evaluation]
+
+%files
+    # Copy the repo into the image so pip install has a local source tree.
+    . /opt/llm-fine-tune
+
+%environment
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
