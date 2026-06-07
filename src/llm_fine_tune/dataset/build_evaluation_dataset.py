@@ -183,28 +183,82 @@ def _bigcode_task_payload(
 # ---- Input/output pair parsing ----
 
 
-def _parse_input_output_pairs(raw: str | None) -> list[dict]:
-    """Parse the raw input_output column into [{"input": [...args], "expected": value}, ...].
+def _parse_input_output_pairs(raw: object) -> list[dict]:
+    """Parse the input_output column into [{"input": [...args], "expected": value}, ...].
 
-    Raises UnparseableInputOutputPairs for null, malformed, or structurally unexpected data.
+    Polars delivers this column already parsed (a Python list) for List[Struct] parquet columns,
+    or as a string for older JSON-string columns.  The two formats the newfacade dataset uses:
+
+      Named-param list (primary):
+        [{"input": "nums1 = [1,2], target = 9", "output": "0"}, ...]
+
+      Structured dict (fallback):
+        {"input": [[args_case1], [args_case2]], "output": [out1, out2]}
+
+    Raises UnparseableInputOutputPairs for null or structurally unexpected data.
+    Raises UnsupportedInputOutputValue for values that cannot be expressed as literals.
     """
     if raw is None:
         raise UnparseableInputOutputPairs("input_output is null")
 
-    parsed: object
+    # Polars already parsed a List[Struct] column → list of dicts.
+    if isinstance(raw, list):
+        return _parse_named_param_cases(raw)
+
+    # String column: parse first, then dispatch.
+    if not isinstance(raw, str):
+        raise UnparseableInputOutputPairs(
+            f"Unexpected input_output type: {type(raw).__name__}"
+        )
     try:
         parsed = ast.literal_eval(raw)
     except (ValueError, SyntaxError):
         try:
             parsed = json.loads(raw)
         except (ValueError, json.JSONDecodeError) as exc:
-            raise UnparseableInputOutputPairs(f"Cannot parse: {exc}") from exc
+            raise UnparseableInputOutputPairs(f"Cannot parse string: {exc}") from exc
 
-    if not isinstance(parsed, dict):
-        raise UnparseableInputOutputPairs(
-            f"Expected dict, got {type(parsed).__name__}: {str(raw)[:80]}"
-        )
+    if isinstance(parsed, list):
+        return _parse_named_param_cases(parsed)
+    if isinstance(parsed, dict):
+        return _parse_structured_dict(parsed)
+    raise UnparseableInputOutputPairs(
+        f"Expected list or dict after parsing, got {type(parsed).__name__}"
+    )
 
+
+def _parse_named_param_cases(cases: list) -> list[dict]:
+    """Handle [{"input": "name = val, ...", "output": "val"}, ...] (newfacade primary format)."""
+    result = []
+    for case in cases:
+        if not isinstance(case, dict):
+            raise UnparseableInputOutputPairs(
+                f"Expected dict in cases list, got {type(case).__name__}"
+            )
+        input_raw = case.get("input", "")
+        output_raw = case.get("output", "")
+        if not isinstance(input_raw, str):
+            raise UnparseableInputOutputPairs(
+                f"Expected string input in named-param case, got {type(input_raw).__name__}"
+            )
+        try:
+            input_args = _parse_named_param_string(input_raw)
+        except UnsupportedInputOutputValue:
+            raise
+        except Exception as exc:
+            raise UnparseableInputOutputPairs(f"Cannot parse input: {exc}") from exc
+        try:
+            expected = _parse_value_string(str(output_raw))
+        except UnsupportedInputOutputValue:
+            raise
+        except Exception as exc:
+            raise UnparseableInputOutputPairs(f"Cannot parse output: {exc}") from exc
+        result.append({"input": input_args, "expected": expected})
+    return result
+
+
+def _parse_structured_dict(parsed: dict) -> list[dict]:
+    """Handle {"input": [[args1], [args2], ...], "output": [out1, out2, ...]} format."""
     inputs_raw = parsed.get("input") or parsed.get("inputs")
     outputs_raw = parsed.get("output") or parsed.get("outputs")
 
@@ -212,27 +266,62 @@ def _parse_input_output_pairs(raw: str | None) -> list[dict]:
         raise UnparseableInputOutputPairs(
             f"Missing input/output keys: {list(parsed.keys())}"
         )
-
-    # Normalize to lists of test cases
     if not isinstance(inputs_raw, list):
         inputs_raw = [inputs_raw]
     if not isinstance(outputs_raw, list):
         outputs_raw = [outputs_raw]
-
     if len(inputs_raw) != len(outputs_raw):
         raise UnparseableInputOutputPairs(
             f"Length mismatch: {len(inputs_raw)} inputs vs {len(outputs_raw)} outputs"
         )
-
-    # Each input element must be a list of arguments for that test case.
-    # If it's not a list (single-arg function), wrap it.
     return [
-        {
-            "input": inp if isinstance(inp, list) else [inp],
-            "expected": out,
-        }
+        {"input": inp if isinstance(inp, list) else [inp], "expected": out}
         for inp, out in zip(inputs_raw, outputs_raw)
     ]
+
+
+def _parse_named_param_string(input_str: str) -> list:
+    """Parse 'name1 = val1, name2 = val2' → [val1, val2] preserving parameter order.
+
+    Splits only at depth-0 commas so values that are lists/dicts are kept intact.
+    """
+    params: list = []
+    depth = 0
+    current = ""
+
+    for char in input_str:
+        if char in "([{":
+            depth += 1
+            current += char
+        elif char in ")]}":
+            depth -= 1
+            current += char
+        elif char == "," and depth == 0:
+            _, _, value_part = current.partition("=")
+            params.append(_parse_value_string(value_part.strip()))
+            current = ""
+        else:
+            current += char
+
+    if current.strip():
+        _, _, value_part = current.partition("=")
+        params.append(_parse_value_string(value_part.strip()))
+
+    return params
+
+
+def _parse_value_string(s: str) -> object:
+    """Parse a single value string using ast.literal_eval with a json.loads fallback."""
+    s = s.strip()
+    try:
+        return ast.literal_eval(s)
+    except (ValueError, SyntaxError):
+        pass
+    try:
+        return json.loads(s)
+    except (ValueError, json.JSONDecodeError):
+        pass
+    raise UnsupportedInputOutputValue(f"Cannot parse value: {s!r}")
 
 
 # ---- Execution engine construction ----
