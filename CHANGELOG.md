@@ -1,3 +1,24 @@
+## 1.2.0 (2026-06-11)
+
+### Feat
+
+- **evluation/**: add evaluation dataset along with evaluation-related infrastructure like the dockerfile
+- **evluation/hpc/goethe**: add goethe hpc evaluation scripts
+- **evaluation/**: add evaluation package, including a new evaluation dataset under the dataset/ phase
+- **dataset/**: combine with secondary dataset from newfacade/LeetCodeDataset to add input/output pairs, problem difficulty, and a few other useful columns
+
+### Fix
+
+- **build_evaluation_dataset.py**: fix parsing error on input_output_pairs
+- **goethe/env.sh**: place hugging face cache in node storage to avoid race condition on the locked file
+- **configs/**: replace soon-to-be depricated warmup_ration: 0.3 -> warmup_steps: 10
+- **goethe/env.sh**: export hugging face cache to work directory on setup
+
+### Refactor
+
+- **dataset/**: change terminology from problem -> code_snippet, i.e. reframe from leetcode problem to generic code_snippet
+- **codebase**: refactor for easier maintainability and readabilitiy
+
 ## 1.1.0 (2026-05-31)
 
 ### Feat

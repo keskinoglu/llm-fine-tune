@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-fine-tune"
-version = "1.1.0"
+version = "1.2.0"
 description = "End-to-end pipeline for fine-tuning an open LLM on a custom code dataset"
 readme = "README.md"
 # capped at <3.13: ROCm 6.2 torch wheels only exist for cp39–cp312
