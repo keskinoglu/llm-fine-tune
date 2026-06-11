@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from llm_fine_tune.evaluation import metrics
-from llm_fine_tune.evaluation.execution import ExecutionResult
+from llm_fine_tune.execution_harness.execution import ExecutionResult
 
 
 def score(

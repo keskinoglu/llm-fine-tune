@@ -62,7 +62,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _enrich(base_frame: pl.DataFrame, secondary_frame: pl.DataFrame) -> pl.DataFrame:
-    return base_frame.join(secondary_frame, on="code_snippet_id", how="left")
+    return base_frame.join(secondary_frame, on="parallel_id", how="left")
 
 
 # ---- Integrity reporting ----
@@ -91,9 +91,9 @@ def _calculate_source_overlap(
     base_frame: pl.DataFrame,
     secondary_frame: pl.DataFrame,
 ) -> _SourceOverlapStats:
-    primary_ids = set(base_frame["code_snippet_id"].to_list())
-    secondary_ids = set(secondary_frame["code_snippet_id"].to_list())
-    only_in_secondary, only_in_primary = source_newfacade.unmatched_code_snippet_ids(
+    primary_ids = set(base_frame["parallel_id"].to_list())
+    secondary_ids = set(secondary_frame["parallel_id"].to_list())
+    only_in_secondary, only_in_primary = source_newfacade.unmatched_parallel_ids(
         primary_ids, secondary_ids
     )
     return _SourceOverlapStats(
@@ -132,7 +132,7 @@ def _print_title_mismatches(mismatches: list[dict]) -> None:
     print(f"  Title mismatches:       {len(mismatches):,}")
     for mismatch in mismatches[:5]:
         print(
-            f"    id={mismatch['code_snippet_id']}: "
+            f"    id={mismatch['parallel_id']}: "
             f"'{mismatch['base_title']}' vs task_id='{mismatch['task_id']}'"
         )
     if len(mismatches) > 5:

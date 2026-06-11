@@ -16,7 +16,6 @@ from llm_fine_tune.dataset import source_cache
 
 # Columns merged from newfacade into base.
 # Excluded (Python-specific, unusable for C++/Java evaluation):
-#   test         — Python assertion harness, language-specific
 #   starter_code — Python stub only
 #   completion   — Python reference solution (walkccc's python col already covers this)
 MERGE_COLUMNS = [
@@ -30,6 +29,7 @@ MERGE_COLUMNS = [
     "tags",
     "estimated_date",
     "task_id",
+    "test",
 ]
 
 _REPO_ID = "newfacade/LeetCodeDataset"
@@ -46,7 +46,7 @@ def load_newfacade_frame(*, refresh: bool = False) -> pl.DataFrame:
         _REPO_ID, _CACHE_PATH, refresh=refresh
     )
     return full_frame.select(["question_id"] + MERGE_COLUMNS).rename(
-        {"question_id": "code_snippet_id"}
+        {"question_id": "parallel_id"}
     )
 
 
@@ -63,7 +63,7 @@ def slugify(title: str) -> str:
     return slug.strip("-")
 
 
-def unmatched_code_snippet_ids(
+def unmatched_parallel_ids(
     base_ids: set[int],
     newfacade_ids: set[int],
 ) -> tuple[set[int], set[int]]:
@@ -76,14 +76,14 @@ def title_mismatches(
     newfacade_frame: pl.DataFrame,
 ) -> list[dict]:
     """Return matched rows where slugify(base.title) != newfacade.task_id."""
-    joined = base_frame.select(["code_snippet_id", "title"]).join(
-        newfacade_frame.select(["code_snippet_id", "task_id"]),
-        on="code_snippet_id",
+    joined = base_frame.select(["parallel_id", "title"]).join(
+        newfacade_frame.select(["parallel_id", "task_id"]),
+        on="parallel_id",
         how="inner",
     )
     return [
         {
-            "code_snippet_id": row["code_snippet_id"],
+            "parallel_id": row["parallel_id"],
             "base_title": row["title"],
             "task_id": row["task_id"],
         }

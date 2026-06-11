@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+total_mem=$(free -b | awk '/^Mem:/{print $2}')
+mem_70pct=$(( total_mem * 70 / 100 ))
+mem_floor=$(( total_mem - 4 * 1024 * 1024 * 1024 ))
+(( mem_floor < 1 )) && mem_floor=1
+mem_limit=$(( mem_70pct < mem_floor ? mem_70pct : mem_floor ))
+cpu_limit=$(( $(nproc) - 2 ))
+(( cpu_limit < 1 )) && cpu_limit=1
+
+exec docker run --rm \
+    --memory="${mem_limit}" \
+    --memory-swap="${mem_limit}" \
+    --cpus="${cpu_limit}" \
+    --network=none \
+    -e PYTHONPATH=/workspace/src \
+    -v "$(pwd)":/workspace \
+    -w /workspace \
+    llm-fine-tune-exec \
+    validate-expected-translations --workers "${cpu_limit}" "$@"

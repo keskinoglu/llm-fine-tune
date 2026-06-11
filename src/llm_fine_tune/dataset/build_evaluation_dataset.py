@@ -2,8 +2,8 @@
 
 Reads the base dataset, re-derives the held-out test split (same parameters as
 the instruct build), then produces one bigcode_task_payload per held-out
-code_snippet × directed language pair. Each row carries a target-language
-execution_engine (built from the snippet's expected_input_output_pairs) and all
+parallel x directed language pair. Each row carries a target-language
+execution_engine (built from the parallel's shared input_output_pairs) and all
 fields bigcode needs for generation and grading.
 
 Run with: uv run build-evaluation-dataset
@@ -13,14 +13,16 @@ Requires: output/leetcode-solutions.parquet (run `make base` first)
 from __future__ import annotations
 
 import argparse
-import ast
-import itertools
+import collections
 import json
 import random
+from pathlib import Path
 
 import polars as pl
+from tqdm import tqdm
 
 from llm_fine_tune import loaders
+from llm_fine_tune.execution_harness import datatypes
 from llm_fine_tune.dataset import splits
 from llm_fine_tune.dataset.build_instruct_dataset import (
     DEFAULT_SPLIT_SEED,
@@ -28,14 +30,17 @@ from llm_fine_tune.dataset.build_instruct_dataset import (
     INSTRUCT_LANGUAGES,
 )
 from llm_fine_tune.dataset.instruction_generator import generate_instruction
+from llm_fine_tune.dataset.quality import test_assertion_parser
 
 BASE_PARQUET_PATH = loaders.OUTPUT_DIR / "leetcode-solutions.parquet"
 OUTPUT_PATH = loaders.OUTPUT_DIR / "leetcode-evaluation.parquet"
 
 DEFAULT_SEED = 0
 
+_EXCLUSIONS_PATH = Path(__file__).parent / "quality" / "exclusions.json"
+
 _SCHEMA = {
-    "code_snippet_id": pl.Int64,
+    "parallel_id": pl.Int64,
     "source_language": pl.Utf8,
     "target_language": pl.Utf8,
     "user_prompt": pl.Utf8,
@@ -47,34 +52,31 @@ _SCHEMA = {
 }
 
 
-class UnparseableInputOutputPairs(ValueError):
-    pass
-
-
-class UnsupportedInputOutputValue(ValueError):
-    pass
-
-
 def main() -> None:
     args = _parse_args()
     loaders.require_file(BASE_PARQUET_PATH, "run `make base` first.")
 
-    base = pl.read_parquet(BASE_PARQUET_PATH)
-    print(f"Loaded base dataset: {base.height:,} code snippets")
+    base_dataset = pl.read_parquet(BASE_PARQUET_PATH)
+    print(f"Loaded base dataset: {base_dataset.height:,} parallels")
 
-    held_out_ids = _held_out_code_snippet_ids(base)
-    held_out = base.filter(pl.col("code_snippet_id").is_in(list(held_out_ids)))
+    held_out = base_dataset.filter(
+        pl.col("parallel_id").is_in(list(_held_out_parallel_ids(base_dataset)))
+    )
     print(
         f"Held-out split (test_frac={DEFAULT_TEST_FRAC}, seed={DEFAULT_SPLIT_SEED}): "
-        f"{held_out.height:,} code snippets"
+        f"{held_out.height:,} parallels"
     )
 
     instruction_rng = random.Random(args.seed)
     print("Building bigcode_task_payloads ...")
-    payloads, coverage = _build_bigcode_task_payloads(held_out, instruction_rng)
+    bigcode_task_payloads, input_output_pairs_usability_report = (
+        _build_bigcode_task_payloads(held_out, instruction_rng)
+    )
 
-    loaders.write_parquet(pl.DataFrame(payloads, schema=_SCHEMA), OUTPUT_PATH)
-    _print_coverage(coverage)
+    loaders.write_parquet(
+        pl.DataFrame(bigcode_task_payloads, schema=_SCHEMA), OUTPUT_PATH
+    )
+    _print_report(input_output_pairs_usability_report)
 
 
 # ---- Argument parsing ----
@@ -96,17 +98,17 @@ def _parse_args() -> argparse.Namespace:
 # ---- Split reproduction ----
 
 
-def _held_out_code_snippet_ids(base: pl.DataFrame) -> set[int]:
-    """Reproduce the instruct split exactly: eligible snippets have solutions in ≥2 languages."""
+def _held_out_parallel_ids(base: pl.DataFrame) -> set[int]:
+    """Reproduce the instruct split exactly: eligible parallels have code_snippets in >=2 languages."""
     eligible_mask = (
         sum(pl.col(lang).is_not_null().cast(pl.Int32) for lang in INSTRUCT_LANGUAGES)
         >= 2
     )
     eligible = base.filter(eligible_mask)
     _, test_side = splits.split_by_key(
-        eligible, "code_snippet_id", DEFAULT_TEST_FRAC, DEFAULT_SPLIT_SEED
+        eligible, "parallel_id", DEFAULT_TEST_FRAC, DEFAULT_SPLIT_SEED
     )
-    return set(test_side["code_snippet_id"].to_list())
+    return set(test_side["parallel_id"].to_list())
 
 
 # ---- Payload construction ----
@@ -115,32 +117,26 @@ def _held_out_code_snippet_ids(base: pl.DataFrame) -> set[int]:
 def _build_bigcode_task_payloads(
     held_out: pl.DataFrame, instruction_rng: random.Random
 ) -> tuple[list[dict], dict]:
-    payloads: list[dict] = []
-    unparseable = 0
-    unsupported = 0
+    bigcode_task_payloads: list[dict] = []
+    input_output_pairs_usability_report = _new_report()
+    exclusions = _load_exclusions()
 
-    for code_snippet in held_out.iter_rows(named=True):
-        for source_language, target_language in itertools.permutations(
-            INSTRUCT_LANGUAGES, 2
+    for parallel in tqdm(
+        held_out.iter_rows(named=True),
+        total=held_out.height,
+        desc="Building rows",
+    ):
+        for (
+            source_language,
+            target_language,
+            execution_engine,
+            expected_input_output_pairs,
+        ) in _executable_translations(
+            parallel, input_output_pairs_usability_report, exclusions
         ):
-            if not (code_snippet[source_language] and code_snippet[target_language]):
-                continue
-            try:
-                expected_input_output_pairs = _parse_input_output_pairs(
-                    code_snippet["input_output"]
-                )
-                execution_engine = _build_execution_engine(
-                    code_snippet, target_language, expected_input_output_pairs
-                )
-            except UnparseableInputOutputPairs:
-                unparseable += 1
-                continue
-            except UnsupportedInputOutputValue:
-                unsupported += 1
-                continue
-            payloads.append(
-                _bigcode_task_payload(
-                    code_snippet,
+            bigcode_task_payloads.append(
+                _build_bigcode_task_payload(
+                    parallel,
                     source_language,
                     target_language,
                     expected_input_output_pairs,
@@ -149,412 +145,638 @@ def _build_bigcode_task_payloads(
                 )
             )
 
-    coverage = {
-        "kept": len(payloads),
-        "unparseable": unparseable,
-        "unsupported": unsupported,
-    }
-    return payloads, coverage
+    return bigcode_task_payloads, input_output_pairs_usability_report
 
 
-def _bigcode_task_payload(
-    code_snippet: dict,
+def _build_bigcode_task_payload(
+    parallel: dict,
     source_language: str,
     target_language: str,
     expected_input_output_pairs: list[dict],
     execution_engine: str,
     instruction_rng: random.Random,
 ) -> dict:
+    """One bigcode_task_payload row (expected_input_output_pairs = json.dumps(...))."""
     return {
-        "code_snippet_id": code_snippet["code_snippet_id"],
+        "parallel_id": parallel["parallel_id"],
         "source_language": source_language,
         "target_language": target_language,
         "user_prompt": generate_instruction(
             source_language, target_language, instruction_rng
         ),
-        "code_snippet_to_translate": code_snippet[source_language],
-        "expected_code_snippet_translation": code_snippet[target_language],
+        "code_snippet_to_translate": parallel[source_language],
+        "expected_code_snippet_translation": parallel[target_language],
         "execution_engine": execution_engine,
         "expected_input_output_pairs": json.dumps(expected_input_output_pairs),
-        "difficulty": code_snippet.get("difficulty"),
+        "difficulty": parallel.get("difficulty"),
     }
 
 
-# ---- Input/output pair parsing ----
+def _load_exclusions() -> set[tuple[int, str]]:
+    if not _EXCLUSIONS_PATH.exists():
+        return set()
+    records = json.loads(_EXCLUSIONS_PATH.read_text())
+    return {(r["parallel_id"], r["target_language"]) for r in records}
 
 
-def _parse_input_output_pairs(raw: object) -> list[dict]:
-    """Parse the input_output column into [{"input": [...args], "expected": value}, ...].
-
-    Polars delivers this column already parsed (a Python list) for List[Struct] parquet columns,
-    or as a string for older JSON-string columns.  The two formats the newfacade dataset uses:
-
-      Named-param list (primary):
-        [{"input": "nums1 = [1,2], target = 9", "output": "0"}, ...]
-
-      Structured dict (fallback):
-        {"input": [[args_case1], [args_case2]], "output": [out1, out2]}
-
-    Raises UnparseableInputOutputPairs for null or structurally unexpected data.
-    Raises UnsupportedInputOutputValue for values that cannot be expressed as literals.
+def _executable_translations(
+    parallel: dict,
+    input_output_pairs_usability_report: dict,
+    exclusions: set[tuple[int, str]],
+) -> list[tuple]:
+    """The (source_language, target_language, execution_engine, input_output_pairs)
+    we can execute for this parallel — building each execution_engine once per
+    target_language over the one shared convertible set.  Records why a parallel
+    or input_output_pair is left out; returns [] (after recording why) when none
+    execute.
     """
-    if raw is None:
-        raise UnparseableInputOutputPairs("input_output is null")
+    parallel_id = parallel["parallel_id"]
 
-    # Polars already parsed a List[Struct] column → list of dicts.
-    if isinstance(raw, list):
-        return _parse_named_param_cases(raw)
+    # ---- parse typed test cases from the `test` column ----
+    raw_test = parallel["test"]
+    if not raw_test:
+        input_output_pairs_usability_report["skipped_no_test"] += 1
+        return []
 
-    # String column: parse first, then dispatch.
-    if not isinstance(raw, str):
-        raise UnparseableInputOutputPairs(
-            f"Unexpected input_output type: {type(raw).__name__}"
-        )
+    parsable_input_output_pairs = test_assertion_parser.parse_test_cases(raw_test)
+    if not parsable_input_output_pairs:
+        input_output_pairs_usability_report["skipped_no_test_cases"] += 1
+        return []
+
+    # ---- detect node types from the Python reference signature ----
     try:
-        parsed = ast.literal_eval(raw)
-    except (ValueError, SyntaxError):
-        try:
-            parsed = json.loads(raw)
-        except (ValueError, json.JSONDecodeError) as exc:
-            raise UnparseableInputOutputPairs(f"Cannot parse string: {exc}") from exc
+        node_types = datatypes.detect_node_types(parallel)
+    except datatypes.UnsupportedInputOutputValue:
+        input_output_pairs_usability_report["skipped_no_python_reference"] += 1
+        return []
 
-    if isinstance(parsed, list):
-        return _parse_named_param_cases(parsed)
-    if isinstance(parsed, dict):
-        return _parse_structured_dict(parsed)
-    raise UnparseableInputOutputPairs(
-        f"Expected list or dict after parsing, got {type(parsed).__name__}"
+    # ---- filter convertible ----
+    (
+        convertible,
+        unconvertible,
+    ) = _filter_input_output_pairs_convertible_to_datatypes_in_all_supported_languages(
+        parsable_input_output_pairs, node_types
+    )
+    input_output_pairs_usability_report["unconvertible_input_output_pair_count"] += len(
+        unconvertible
     )
 
+    if not convertible:
+        input_output_pairs_usability_report[
+            "skipped_no_convertible_input_output_pairs"
+        ] += 1
+        return []
 
-def _parse_named_param_cases(cases: list) -> list[dict]:
-    """Handle [{"input": "name = val, ...", "output": "val"}, ...] (newfacade primary format)."""
-    result = []
-    for case in cases:
-        if not isinstance(case, dict):
-            raise UnparseableInputOutputPairs(
-                f"Expected dict in cases list, got {type(case).__name__}"
-            )
-        input_raw = case.get("input", "")
-        output_raw = case.get("output", "")
-        if not isinstance(input_raw, str):
-            raise UnparseableInputOutputPairs(
-                f"Expected string input in named-param case, got {type(input_raw).__name__}"
-            )
-        try:
-            input_args = _parse_named_param_string(input_raw)
-        except UnsupportedInputOutputValue:
-            raise
-        except Exception as exc:
-            raise UnparseableInputOutputPairs(f"Cannot parse input: {exc}") from exc
-        try:
-            expected = _parse_value_string(str(output_raw))
-        except UnsupportedInputOutputValue:
-            raise
-        except Exception as exc:
-            raise UnparseableInputOutputPairs(f"Cannot parse output: {exc}") from exc
-        result.append({"input": input_args, "expected": expected})
-    return result
+    # ---- no expected output (PLAIN return, all None) ----
+    if _has_no_expected_output(convertible, node_types):
+        input_output_pairs_usability_report["skipped_no_expected_output"] += 1
+        return []
 
+    # ---- build engines per target_language over the one shared set ----
+    present_languages = _present_languages(parallel)
+    executable_translations: list[tuple] = []
 
-def _parse_structured_dict(parsed: dict) -> list[dict]:
-    """Handle {"input": [[args1], [args2], ...], "output": [out1, out2, ...]} format."""
-    inputs_raw = parsed.get("input") or parsed.get("inputs")
-    outputs_raw = parsed.get("output") or parsed.get("outputs")
-
-    if inputs_raw is None or outputs_raw is None:
-        raise UnparseableInputOutputPairs(
-            f"Missing input/output keys: {list(parsed.keys())}"
+    for target_language in present_languages:
+        if (parallel_id, target_language) in exclusions:
+            input_output_pairs_usability_report["excluded_by_quality_audit"] += 1
+            continue
+        execution_engine = _build_execution_engine(
+            target_language,
+            convertible,
+            node_types,
+            parallel["entry_point"],
+            java_source=parallel.get("java") if target_language == "java" else None,
         )
-    if not isinstance(inputs_raw, list):
-        inputs_raw = [inputs_raw]
-    if not isinstance(outputs_raw, list):
-        outputs_raw = [outputs_raw]
-    if len(inputs_raw) != len(outputs_raw):
-        raise UnparseableInputOutputPairs(
-            f"Length mismatch: {len(inputs_raw)} inputs vs {len(outputs_raw)} outputs"
-        )
-    return [
-        {"input": inp if isinstance(inp, list) else [inp], "expected": out}
-        for inp, out in zip(inputs_raw, outputs_raw)
-    ]
+        for source_language in present_languages:
+            if source_language != target_language:
+                executable_translations.append(
+                    (
+                        source_language,
+                        target_language,
+                        execution_engine,
+                        convertible,
+                    )
+                )
+
+    # ---- record kept ----
+    _record_kept(
+        input_output_pairs_usability_report,
+        parallel_id,
+        executable_translations,
+        node_types,
+        convertible,
+    )
+    return executable_translations
 
 
-def _parse_named_param_string(input_str: str) -> list:
-    """Parse 'name1 = val1, name2 = val2' → [val1, val2] preserving parameter order.
+def _present_languages(parallel: dict) -> list[str]:
+    return [lang for lang in INSTRUCT_LANGUAGES if parallel.get(lang)]
 
-    Splits only at depth-0 commas so values that are lists/dicts are kept intact.
+
+# ---- Filter convertible ----
+
+
+def _filter_input_output_pairs_convertible_to_datatypes_in_all_supported_languages(
+    parsable_input_output_pairs: list[dict],
+    node_types: dict,
+) -> tuple[list[dict], list[dict]]:
+    """Split parsable pairs into those whose every value can be code in all
+    of cpp/java/python and those that can't.  Rules are the same across
+    languages so we check once.
     """
-    params: list = []
-    depth = 0
-    current = ""
+    convertible: list[dict] = []
+    unconvertible: list[dict] = []
 
-    for char in input_str:
-        if char in "([{":
-            depth += 1
-            current += char
-        elif char in ")]}":
-            depth -= 1
-            current += char
-        elif char == "," and depth == 0:
-            _, _, value_part = current.partition("=")
-            params.append(_parse_value_string(value_part.strip()))
-            current = ""
-        else:
-            current += char
+    for pair in parsable_input_output_pairs:
+        try:
+            _check_values_convertible(pair, node_types)
+            convertible.append(pair)
+        except datatypes.UnsupportedInputOutputValue:
+            unconvertible.append(pair)
 
-    if current.strip():
-        _, _, value_part = current.partition("=")
-        params.append(_parse_value_string(value_part.strip()))
-
-    return params
+    return convertible, unconvertible
 
 
-def _parse_value_string(s: str) -> object:
-    """Parse a single value string using ast.literal_eval with a json.loads fallback."""
-    s = s.strip()
-    try:
-        return ast.literal_eval(s)
-    except (ValueError, SyntaxError):
-        pass
-    try:
-        return json.loads(s)
-    except (ValueError, json.JSONDecodeError):
-        pass
-    raise UnsupportedInputOutputValue(f"Cannot parse value: {s!r}")
+def _check_values_convertible(pair: dict, node_types: dict) -> None:
+    """Verify every value in *pair* can be expressed as code in cpp/java/python.
+    Raises UnsupportedInputOutputValue otherwise.
+    """
+    param_types = node_types.get("parameters", [])
+    for i, arg in enumerate(pair["input"]):
+        if i < len(param_types) and param_types[i] in (
+            datatypes.LIST_NODE,
+            datatypes.TREE_NODE,
+        ):
+            continue  # node types are convertible
+        _check_plain_convertible(arg)
+
+    ret_type = node_types.get("return_value", datatypes.PLAIN)
+    if ret_type in (datatypes.LIST_NODE, datatypes.TREE_NODE):
+        return  # node return types are convertible
+    if pair["expected"] is None:
+        raise datatypes.UnsupportedInputOutputValue(
+            "expected is None with PLAIN return type — cannot compare"
+        )
+    _check_plain_convertible(pair["expected"])
+
+
+def _check_plain_convertible(value: object) -> None:
+    """Verify *value* can be expressed as a C++ literal (our strictest target)."""
+    datatypes.cpp_literal(value)
+
+
+def _has_no_expected_output(convertible: list[dict], node_types: dict) -> bool:
+    """True if all expected outputs are None and return type is PLAIN.
+
+    This means the problem mutates in place; there is no post-state in the
+    data to compare against.  Skip the whole snippet.
+    """
+    if node_types.get("return_value") in (datatypes.LIST_NODE, datatypes.TREE_NODE):
+        return False  # node returns have a meaningful expected value
+    return all(pair.get("expected") is None for pair in convertible)
 
 
 # ---- Execution engine construction ----
 
 
 def _build_execution_engine(
-    code_snippet: dict, target_language: str, pairs: list[dict]
+    target_language: str,
+    input_output_pairs: list[dict],
+    node_types: dict,
+    entry_point: str | None,
+    java_source: str | None = None,
 ) -> str:
-    """Build the target-language driver that runs a translation against its input_output_pairs.
+    """Build the target-language driver that runs a translation against its pairs.
 
-    The engine is combined with the model's code (the Solution class) in execution.assemble_executable.
-    It outputs one line per test case: "OK" if the result matches expected, "FAIL" otherwise.
-    Raises UnsupportedInputOutputValue for values that cannot be expressed in the target language.
+    The engine is combined with the model's code in execution.py.
+    Outputs one line per test case: "OK" or "FAIL".
     """
-    entry_point = code_snippet.get("entry_point") or "solve"
+    entry_point = (entry_point or "solve").removeprefix("Solution().")
     if target_language == "python":
-        return _python_engine(entry_point, pairs)
+        return _python_engine(entry_point, input_output_pairs, node_types)
     elif target_language == "cpp":
-        return _cpp_engine(entry_point, pairs)
+        return _cpp_engine(entry_point, input_output_pairs, node_types)
     elif target_language == "java":
-        return _java_engine(entry_point, pairs)
+        return _java_engine(entry_point, input_output_pairs, node_types, java_source)
     else:
-        raise UnsupportedInputOutputValue(
+        raise datatypes.UnsupportedInputOutputValue(
             f"Unsupported target language: {target_language!r}"
         )
 
 
-def _python_engine(entry_point: str, pairs: list[dict]) -> str:
-    cases_repr = repr(pairs)
-    return (
-        "\n"
-        "# === EXECUTION ENGINE ===\n"
-        f"_CASES = {cases_repr}\n"
-        "\n"
-        "_sol = Solution()\n"
-        "for _case in _CASES:\n"
-        "    try:\n"
-        f"        _actual = _sol.{entry_point}(*_case['input'])\n"
-        "        print('OK' if _actual == _case['expected'] else 'FAIL')\n"
-        "    except Exception:\n"
-        "        print('FAIL')\n"
-    )
+def _python_engine(entry_point: str, pairs: list[dict], node_types: dict) -> str:
+    """Build Python execution engine, handling ListNode/TreeNode round-trip."""
+    param_types = node_types.get("parameters", [])
+    ret_type = node_types.get("return_value", datatypes.PLAIN)
 
-
-def _cpp_engine(entry_point: str, pairs: list[dict]) -> str:
-    test_blocks: list[str] = []
+    case_lines: list[str] = []
     for i, pair in enumerate(pairs):
         input_args: list[str] = []
-        arg_names: list[str] = []
         for j, arg in enumerate(pair["input"]):
-            cpp_type = _cpp_type(arg)
-            cpp_lit = _cpp_literal(arg)
-            var_name = f"_arg_{i}_{j}"
-            input_args.append(f"        {cpp_type} {var_name} = {cpp_lit};")
-            arg_names.append(var_name)
-        expected_lit = _cpp_literal(pair["expected"])
-        call = f"s.{entry_point}({', '.join(arg_names)})"
-        block = (
-            f"    // test case {i}\n"
-            "    {\n"
-            + "\n".join(input_args)
-            + f"\n        auto _expected_{i} = {expected_lit};\n"
-            f"        auto _result_{i} = {call};\n"
-            f'        std::cout << (_result_{i} == _expected_{i} ? "OK" : "FAIL") << "\\n";\n'
-            "    }"
+            is_node = j < len(param_types) and param_types[j] in (
+                datatypes.LIST_NODE,
+                datatypes.TREE_NODE,
+            )
+            if is_node:
+                if param_types[j] == datatypes.LIST_NODE:
+                    input_args.append(
+                        f"ListNode.from_array({datatypes.list_node_array_text(arg)})"
+                    )
+                else:
+                    input_args.append(
+                        f"TreeNode.from_array({datatypes.tree_node_array_text(arg)})"
+                    )
+            else:
+                input_args.append(datatypes.python_literal(arg))
+        call = f"_actual = _sol.{entry_point}({', '.join(input_args)})"
+        expected_text = _python_expected_text(pair["expected"], ret_type, i)
+        case_lines.append(
+            f"try:\n    {call}\n{expected_text}\nexcept Exception:\n    print('FAIL')\n"
         )
-        test_blocks.append(block)
 
-    body = "\n".join(test_blocks)
+    return "\n# === EXECUTION ENGINE ===\n_sol = Solution()\n" + "".join(case_lines)
+
+
+def _python_expected_text(expected: object, ret_type: str, case_idx: int) -> str:
+    """Return the body lines (4-space indent, no trailing newline) for one test case comparison."""
+    if ret_type == datatypes.LIST_NODE:
+        canonical = datatypes.list_node_array_text(
+            expected if expected is not None else []
+        )
+        return f"    print('OK' if (_actual.to_array() if _actual else []) == {canonical} else 'FAIL')"
+    elif ret_type == datatypes.TREE_NODE:
+        canonical = datatypes.tree_node_array_text(
+            expected if expected is not None else []
+        )
+        return f"    print('OK' if (_actual.to_array() if _actual else []) == {canonical} else 'FAIL')"
+    else:
+        return f"    print('OK' if _actual == {datatypes.python_literal(expected)} else 'FAIL')"
+
+
+_JAVA_REPR_METHOD = (
+    "    static String _repr(Object o) {\n"
+    '        if (o == null) return "null";\n'
+    "        if (o instanceof int[]) return java.util.Arrays.toString((int[]) o);\n"
+    "        if (o instanceof long[]) return java.util.Arrays.toString((long[]) o);\n"
+    "        if (o instanceof double[]) return java.util.Arrays.toString((double[]) o);\n"
+    "        if (o instanceof boolean[]) return java.util.Arrays.toString((boolean[]) o);\n"
+    "        if (o instanceof char[]) return java.util.Arrays.toString((char[]) o);\n"
+    "        if (o instanceof Object[]) {\n"
+    "            Object[] a = (Object[]) o;\n"
+    '            StringBuilder sb = new StringBuilder("[");\n'
+    '            for (int k = 0; k < a.length; k++) { if (k > 0) sb.append(", "); sb.append(_repr(a[k])); }\n'
+    '            return sb.append("]").toString();\n'
+    "        }\n"
+    "        if (o instanceof java.util.List) {\n"
+    "            java.util.List<?> a = (java.util.List<?>) o;\n"
+    '            StringBuilder sb = new StringBuilder("[");\n'
+    '            for (int k = 0; k < a.size(); k++) { if (k > 0) sb.append(", "); sb.append(_repr(a.get(k))); }\n'
+    '            return sb.append("]").toString();\n'
+    "        }\n"
+    "        return String.valueOf(o);\n"
+    "    }\n"
+)
+
+
+def _wide_arg_positions(pairs: list[dict]) -> list[bool]:
+    """For each argument position, True if any pair's value there needs 64-bit ints."""
+    n = max((len(p["input"]) for p in pairs), default=0)
+    return [
+        any(datatypes.needs_int64(p["input"][j]) for p in pairs if j < len(p["input"]))
+        for j in range(n)
+    ]
+
+
+def _java_cast(java_type_str: str) -> str:
+    """Cast expression fragment for unboxing from Object[]; primitives need a double cast."""
+    return {
+        "int": "int)(Integer",
+        "long": "long)(Long",
+        "double": "double)(Double",
+        "float": "float)(Float",
+        "boolean": "boolean)(Boolean",
+        "char": "char)(Character",
+    }.get(java_type_str.strip(), java_type_str)
+
+
+def _cpp_engine(entry_point: str, pairs: list[dict], node_types: dict) -> str:
+    param_types = node_types.get("parameters", [])
+    param_hints = node_types.get("parameter_hints", [])
+    ret_type = node_types.get("return_value", datatypes.PLAIN)
+    wide_args = _wide_arg_positions(pairs)
+    n_cases = len(pairs)
+    n_args = max((len(p["input"]) for p in pairs), default=0)
+
+    decls: list[str] = []
+    args_i: list[str] = []
+    args_0: list[str] = []
+    for j in range(n_args):
+        column = [p["input"][j] for p in pairs]
+        node = param_types[j] if j < len(param_types) else datatypes.PLAIN
+        if node == datatypes.LIST_NODE:
+            lits = ", ".join(datatypes.cpp_literal(v) for v in column)
+            decls.append(f"    std::vector<std::vector<int>> _data{j} = {{{lits}}};")
+            args_i.append(f"_arrayToListNode(_data{j}[i])")
+            args_0.append(f"_arrayToListNode(_data{j}[0])")
+        elif node == datatypes.TREE_NODE:
+            lits = ", ".join(
+                datatypes.cpp_optional_int_vector_literal(v) for v in column
+            )
+            decls.append(
+                f"    std::vector<std::vector<std::optional<int>>> _data{j} = {{{lits}}};"
+            )
+            args_i.append(f"_arrayToTreeNode(_data{j}[i])")
+            args_0.append(f"_arrayToTreeNode(_data{j}[0])")
+        else:
+            hint = param_hints[j] if j < len(param_hints) else ""
+            wide = wide_args[j] if j < len(wide_args) else False
+            elem_t = datatypes.cpp_type_from_hint(
+                hint, column[0] if column else None, wide=wide
+            )
+            lits = ", ".join(datatypes.cpp_literal(v) for v in column)
+            decls.append(f"    std::vector<{elem_t}> _data{j} = {{{lits}}};")
+            args_i.append(f"_data{j}[i]")
+            args_0.append(f"_data{j}[0]")
+
+    call_i = f"s.{entry_point}({', '.join(args_i)})"
+    call_0 = f"s.{entry_point}({', '.join(args_0)})"
+
+    if ret_type == datatypes.LIST_NODE:
+        exp = ", ".join(
+            datatypes.cpp_literal(
+                p["expected"] if isinstance(p["expected"], list) else []
+            )
+            for p in pairs
+        )
+        expected_decl = f"    std::vector<std::vector<int>> _expected = {{{exp}}};"
+        body = (
+            f"            auto _result = {call_i};\n"
+            "            auto _result_arr = _listNodeToArray(_result);\n"
+            '            std::cout << (_result_arr == _expected[i] ? "OK" : "FAIL") << "\\n";'
+        )
+    elif ret_type == datatypes.TREE_NODE:
+        exp = ", ".join(
+            datatypes.cpp_optional_int_vector_literal(
+                p["expected"] if isinstance(p["expected"], list) else []
+            )
+            for p in pairs
+        )
+        expected_decl = (
+            f"    std::vector<std::vector<std::optional<int>>> _expected = {{{exp}}};"
+        )
+        body = (
+            f"            auto _result = {call_i};\n"
+            "            auto _result_arr = _treeNodeToArray(_result);\n"
+            '            std::cout << (_result_arr == _expected[i] ? "OK" : "FAIL") << "\\n";'
+        )
+    else:
+        exp = ", ".join(datatypes.cpp_literal(p["expected"]) for p in pairs)
+        expected_decl = (
+            f"    using _RetT = decltype({call_0});\n"
+            f"    std::vector<_RetT> _expected = {{{exp}}};"
+        )
+        body = (
+            f"            auto _result = {call_i};\n"
+            '            std::cout << (_result == _expected[i] ? "OK" : "FAIL") << "\\n";'
+        )
+
     return (
-        "\n"
-        "// === EXECUTION ENGINE ===\n"
+        "\n// === EXECUTION ENGINE ===\n"
         "int main() {\n"
         "    Solution s;\n"
-        f"{body}\n"
-        "    return 0;\n"
-        "}\n"
+        + "\n".join(decls)
+        + ("\n" if decls else "")
+        + expected_decl
+        + "\n"
+        + f"    for (size_t i = 0; i < {n_cases}; i++) {{\n"
+        + "        try {\n"
+        + body
+        + "\n"
+        + '        } catch (...) { std::cout << "FAIL" << "\\n"; }\n'
+        + "    }\n    return 0;\n}\n"
     )
 
 
-def _java_engine(entry_point: str, pairs: list[dict]) -> str:
-    test_blocks: list[str] = []
-    for i, pair in enumerate(pairs):
-        input_args: list[str] = []
-        arg_names: list[str] = []
-        for j, arg in enumerate(pair["input"]):
-            java_type = _java_type(arg)
-            java_lit = _java_literal(arg)
-            var_name = f"_arg{i}_{j}"
-            input_args.append(f"            {java_type} {var_name} = {java_lit};")
-            arg_names.append(var_name)
-        expected_lit = _java_literal(pair["expected"])
-        expected_type = _java_type(pair["expected"])
-        call = f"_s.{entry_point}({', '.join(arg_names)})"
-        block = (
-            f"        // test case {i}\n"
-            "        {\n"
-            + "\n".join(input_args)
-            + f"\n            {expected_type} _expected{i} = {expected_lit};\n"
-            f"            Object _result{i} = {call};\n"
-            f'            System.out.println(_eq(_result{i}, _expected{i}) ? "OK" : "FAIL");\n'
-            "        }"
-        )
-        test_blocks.append(block)
+def _java_engine(
+    entry_point: str,
+    pairs: list[dict],
+    node_types: dict,
+    java_source: str | None = None,
+) -> str:
+    param_types = node_types.get("parameters", [])
+    ret_type = node_types.get("return_value", datatypes.PLAIN)
+    java_sig_types = (
+        datatypes.parse_java_param_types(java_source, entry_point)
+        if java_source
+        else None
+    )
+    wide_args = _wide_arg_positions(pairs)
+    n_cases = len(pairs)
+    n_args = max((len(p["input"]) for p in pairs), default=0)
 
-    body = "\n".join(test_blocks)
-    return (
-        "\n"
-        "// === EXECUTION ENGINE ===\n"
-        "class Main {\n"
-        "    static boolean _eq(Object a, Object b) {\n"
-        "        if (a == b) return true;\n"
-        "        if (a == null || b == null) return false;\n"
-        "        if (a instanceof int[] && b instanceof int[])\n"
-        "            return java.util.Arrays.equals((int[]) a, (int[]) b);\n"
-        "        if (a instanceof boolean[] && b instanceof boolean[])\n"
-        "            return java.util.Arrays.equals((boolean[]) a, (boolean[]) b);\n"
-        "        if (a instanceof double[] && b instanceof double[])\n"
-        "            return java.util.Arrays.equals((double[]) a, (double[]) b);\n"
-        "        if (a instanceof String[] && b instanceof String[])\n"
-        "            return java.util.Arrays.equals((String[]) a, (String[]) b);\n"
-        "        if (a instanceof int[][] && b instanceof int[][])\n"
-        "            return java.util.Arrays.deepEquals((int[][]) a, (int[][]) b);\n"
-        "        return java.util.Objects.equals(a, b);\n"
-        "    }\n"
-        "\n"
+    decls: list[str] = []
+    call_args: list[str] = []
+    for j in range(n_args):
+        column = [p["input"][j] for p in pairs]
+        node = param_types[j] if j < len(param_types) else datatypes.PLAIN
+        if node == datatypes.LIST_NODE:
+            lits = ", ".join(datatypes.java_literal(v) for v in column)
+            decls.append(f"        int[][] _data{j} = {{{lits}}};")
+            call_args.append(f"_NodeHelpers.arrayToListNode(_data{j}[i])")
+        elif node == datatypes.TREE_NODE:
+            lits = ", ".join(
+                datatypes.java_nullable_int_array_literal(v) for v in column
+            )
+            decls.append(f"        Integer[][] _data{j} = {{{lits}}};")
+            call_args.append(f"_NodeHelpers.arrayToTreeNode(_data{j}[i])")
+        else:
+            jt = (
+                java_sig_types[j]
+                if (java_sig_types and j < len(java_sig_types))
+                else (datatypes.java_type(column[0]) if column else "Object")
+            )
+            if j < len(wide_args) and wide_args[j]:
+                jt = datatypes.widen_java_int_type(jt)
+            lits = ", ".join(datatypes.java_literal_for_type(v, jt) for v in column)
+            decls.append(f"        Object[] _data{j} = {{{lits}}};")
+            call_args.append(f"({_java_cast(jt)}) _data{j}[i]")
+
+    call = f"_s.{entry_point}({', '.join(call_args)})"
+
+    if ret_type == datatypes.LIST_NODE:
+        exp = ", ".join(
+            datatypes.java_literal(
+                p["expected"] if isinstance(p["expected"], list) else []
+            )
+            for p in pairs
+        )
+        expected_decl = f"        int[][] _expected = {{{exp}}};"
+        body = (
+            f"                ListNode _result = {call};\n"
+            "                int[] _result_arr = _NodeHelpers.listNodeToArray(_result);\n"
+            '                System.out.println(java.util.Arrays.equals(_result_arr, _expected[i]) ? "OK" : "FAIL");'
+        )
+    elif ret_type == datatypes.TREE_NODE:
+        exp = ", ".join(
+            datatypes.java_nullable_int_array_literal(
+                p["expected"] if isinstance(p["expected"], list) else []
+            )
+            for p in pairs
+        )
+        expected_decl = f"        Integer[][] _expected = {{{exp}}};"
+        body = (
+            f"                TreeNode _result = {call};\n"
+            "                Integer[] _result_arr = _NodeHelpers.treeNodeToArray(_result);\n"
+            '                System.out.println(java.util.Arrays.equals(_result_arr, _expected[i]) ? "OK" : "FAIL");'
+        )
+    else:
+        exp = ", ".join(datatypes.java_literal(p["expected"]) for p in pairs)
+        expected_decl = f"        Object[] _expected = {{{exp}}};"
+        body = (
+            f"                Object _result = {call};\n"
+            '                System.out.println(_repr(_result).equals(_repr(_expected[i])) ? "OK" : "FAIL");'
+        )
+
+    main = (
         "    public static void main(String[] _args) {\n"
         "        Solution _s = new Solution();\n"
-        f"{body}\n"
-        "    }\n"
-        "}\n"
+        + "\n".join(decls)
+        + ("\n" if decls else "")
+        + expected_decl
+        + "\n"
+        + f"        for (int i = 0; i < {n_cases}; i++) {{\n"
+        + "            try {\n"
+        + body
+        + "\n"
+        + '            } catch (Throwable _e) { System.out.println("FAIL"); }\n'
+        + "        }\n    }\n"
+    )
+    return (
+        "\n// === EXECUTION ENGINE ===\nclass Main {\n"
+        + _JAVA_REPR_METHOD
+        + "\n"
+        + main
+        + "}\n"
     )
 
 
-# ---- Language-specific type and literal generators ----
+# ---- Usability report ----
 
 
-def _cpp_type(value: object) -> str:
-    if isinstance(value, bool):
-        return "bool"
-    if isinstance(value, int):
-        return "int"
-    if isinstance(value, float):
-        return "double"
-    if isinstance(value, str):
-        return "std::string"
-    if isinstance(value, list):
-        if not value:
-            return "std::vector<int>"
-        elem = value[0]
-        return f"std::vector<{_cpp_type(elem)}>"
-    raise UnsupportedInputOutputValue(
-        f"No C++ type mapping for {type(value).__name__!r}: {value!r}"
+def _new_report() -> dict:
+    """A plain dict (not a class) recording which snippets/pairs were usable and why the rest were skipped."""
+    return {
+        "kept": 0,
+        "kept_with_node_types": 0,
+        "kept_input_output_pair_count": 0,
+        "kept_parallel_ids_by_target_language": collections.defaultdict(set),
+        "kept_payloads_by_target_language": collections.Counter(),
+        "skipped_no_test": 0,
+        "skipped_no_test_cases": 0,
+        "skipped_no_python_reference": 0,
+        "skipped_no_expected_output": 0,
+        "skipped_no_convertible_input_output_pairs": 0,
+        "excluded_by_quality_audit": 0,
+        "unconvertible_input_output_pair_count": 0,
+    }
+
+
+def _record_kept(
+    report: dict,
+    parallel_id: int,
+    executable_translations: list[tuple],
+    node_types: dict,
+    convertible_pairs: list[dict],
+) -> None:
+    report["kept"] += len(executable_translations)
+    report["kept_input_output_pair_count"] += len(convertible_pairs)
+    has_nodes = any(
+        t in (datatypes.LIST_NODE, datatypes.TREE_NODE)
+        for t in node_types.get("parameters", []) + [node_types.get("return_value")]
     )
+    if has_nodes:
+        report["kept_with_node_types"] += len(executable_translations)
+    for _, target_language, _, _ in executable_translations:
+        report["kept_parallel_ids_by_target_language"][target_language].add(parallel_id)
+        report["kept_payloads_by_target_language"][target_language] += 1
 
 
-def _cpp_literal(value: object) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        return repr(value)
-    if isinstance(value, str):
-        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-        return f'"{escaped}"'
-    if isinstance(value, list):
-        elements = ", ".join(_cpp_literal(v) for v in value)
-        return "{" + elements + "}"
-    raise UnsupportedInputOutputValue(
-        f"No C++ literal for {type(value).__name__!r}: {value!r}"
+def _print_report(report: dict) -> None:
+    ids_by_lang = report["kept_parallel_ids_by_target_language"]
+    kept_parallels = len(set().union(*ids_by_lang.values())) if ids_by_lang else 0
+    kept_payloads = report["kept"]
+    kept_pairs = report["kept_input_output_pair_count"]
+    avg_pairs = kept_pairs / kept_parallels if kept_parallels else 0
+
+    skipped = (
+        report["skipped_no_test"]
+        + report["skipped_no_test_cases"]
+        + report["skipped_no_python_reference"]
+        + report["skipped_no_expected_output"]
+        + report["skipped_no_convertible_input_output_pairs"]
     )
+    total_parallels = kept_parallels + skipped
 
+    payloads_by_lang = report["kept_payloads_by_target_language"]
 
-def _java_type(value: object) -> str:
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, int):
-        return "int"
-    if isinstance(value, float):
-        return "double"
-    if isinstance(value, str):
-        return "String"
-    if isinstance(value, list):
-        if not value:
-            return "int[]"
-        elem = value[0]
-        elem_type = _java_type(elem)
-        primitive_arrays = {
-            "int": "int[]",
-            "boolean": "boolean[]",
-            "double": "double[]",
-        }
-        return primitive_arrays.get(elem_type, f"{elem_type}[]")
-    raise UnsupportedInputOutputValue(
-        f"No Java type mapping for {type(value).__name__!r}: {value!r}"
-    )
+    def _parallels(n: int) -> str:
+        return f"{n:,} parallel{'s' if n != 1 else ''}"
 
+    def _payloads(n: int) -> str:
+        return f"{n:,} bigcode task payload{'s' if n != 1 else ''}"
 
-def _java_literal(value: object) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        return repr(value)
-    if isinstance(value, str):
-        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-        return f'"{escaped}"'
-    if isinstance(value, list):
-        if not value:
-            return "new int[]{}"
-        elem = value[0]
-        elem_type = _java_type(elem)
-        elements = ", ".join(_java_literal(v) for v in value)
-        return f"new {elem_type}[]{{{elements}}}"
-    raise UnsupportedInputOutputValue(
-        f"No Java literal for {type(value).__name__!r}: {value!r}"
-    )
+    def _cases(n: int) -> str:
+        return f"{n:,} test case{'s' if n != 1 else ''}"
 
+    print(f"\nEvaluation dataset: {OUTPUT_PATH}")
 
-# ---- Reporting ----
-
-
-def _print_coverage(coverage: dict) -> None:
-    total = coverage["kept"] + coverage["unparseable"] + coverage["unsupported"]
     print(
-        f"\nEvaluation dataset built:"
-        f"\n  kept:        {coverage['kept']:,} bigcode_task_payloads → {OUTPUT_PATH}"
-        f"\n  unparseable: {coverage['unparseable']:,} rows skipped (bad input_output)"
-        f"\n  unsupported: {coverage['unsupported']:,} rows skipped (unsupported value types)"
-        f"\n  total:       {total:,} candidate rows"
+        f"\n  {_parallels(kept_parallels)} / {total_parallels:,} held-out ({kept_parallels / total_parallels * 100:.0f}%)"
+        f"  →  {_payloads(kept_payloads)}  ({_cases(kept_pairs)}, avg {avg_pairs:.1f}/parallel)"
     )
+    if report["kept_with_node_types"]:
+        node_n = report["kept_with_node_types"]
+        print(f"     {_payloads(node_n)} involve ListNode / TreeNode")
+
+    print("\n  Per target language (all share the same test cases per parallel):")
+    for lang in INSTRUCT_LANGUAGES:
+        n_parallels = len(ids_by_lang.get(lang, set()))
+        n_payloads = payloads_by_lang.get(lang, 0)
+        print(f"    {lang:6s}  {_parallels(n_parallels)}  →  {_payloads(n_payloads)}")
+
+    print(f"\n  Skipped: {_parallels(skipped)}")
+    for label_fn, key in [
+        (
+            lambda n: f"{_parallels(n)} absent from newfacade source (no test column)",
+            "skipped_no_test",
+        ),
+        (
+            lambda n: f"{_parallels(n)} with no parseable test cases",
+            "skipped_no_test_cases",
+        ),
+        (
+            lambda n: (
+                f"{_parallels(n)} with no Python code snippet (required for ListNode / TreeNode detection)"
+            ),
+            "skipped_no_python_reference",
+        ),
+        (
+            lambda n: (
+                f"{_parallels(n)} where all input output pairs contain values not expressible in target languages"
+            ),
+            "skipped_no_convertible_input_output_pairs",
+        ),
+    ]:
+        v = report[key]
+        if v:
+            print(f"    {v:>4}  {label_fn(v)}")
+
+    if report["excluded_by_quality_audit"]:
+        v = report["excluded_by_quality_audit"]
+        print(f"    {v:>4}  {_payloads(v)} excluded by quality audit")
+    if report["unconvertible_input_output_pair_count"]:
+        v = report["unconvertible_input_output_pair_count"]
+        print(f"\n  {_cases(v)} parsed but not expressible in target language code")
 
 
 if __name__ == "__main__":

@@ -3,3 +3,4 @@ train-your-own-llm-course-material
 data/
 output/
 .env
+*.md

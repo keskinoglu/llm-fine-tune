@@ -10,7 +10,8 @@ import json
 
 from bigcode_eval.base import Task
 
-from llm_fine_tune.evaluation import execution, score
+from llm_fine_tune.execution_harness import execution
+from llm_fine_tune.evaluation import score
 from llm_fine_tune.evaluation import extract_code_snippet_from_llm_response as extractor
 
 
@@ -54,19 +55,19 @@ class CodeSnippetTranslationTask(Task):
 
 def _score_single_sample(payload: dict, code_snippet_from_llm_response: str) -> dict:
     expected_input_output_pairs = json.loads(payload["expected_input_output_pairs"])
-    executable = execution.assemble_executable(
+    executable = execution.build_executable_code_snippet_from_llm_response(
         payload["execution_engine"],
         code_snippet_from_llm_response,
         payload["target_language"],
     )
-    execution_result = execution.run(executable, payload["target_language"])
+    execution_result = execution.execute(executable, payload["target_language"])
     sample_scores = score.score(
         code_snippet_from_llm_response,
         execution_result,
         expected_input_output_pairs,
     )
     return {
-        "code_snippet_id": payload["code_snippet_id"],
+        "parallel_id": payload["parallel_id"],
         "source_language": payload["source_language"],
         "target_language": payload["target_language"],
         "difficulty": payload.get("difficulty"),

@@ -1,7 +1,7 @@
 """Upload the LeetCode dataset to HuggingFace Hub (Stage 1, step 3).
 
-Validates that all local Parquet files and the dataset card exist, then
-pushes them as a single atomic commit to tkeskin/leetcode-solutions.
+Validates that the selected local Parquet files and the dataset card exist,
+then pushes them as a single atomic commit to tkeskin/leetcode-solutions.
 """
 
 from __future__ import annotations
@@ -16,19 +16,39 @@ from llm_fine_tune import loaders
 REPO_ID = "tkeskin/leetcode-solutions"
 REPO_TYPE = "dataset"
 
-BASE_PARQUET_PATH = loaders.OUTPUT_DIR / "leetcode-solutions.parquet"
-INSTRUCT_TRAIN_PATH = loaders.OUTPUT_DIR / "leetcode-instruct-train.parquet"
-INSTRUCT_TEST_PATH = loaders.OUTPUT_DIR / "leetcode-instruct-test.parquet"
 DATASET_CARD_PATH = Path("dataset_card/README.md")
+
+_DATASET_FILES: dict[str, list[tuple[Path, str]]] = {
+    "base": [
+        (loaders.OUTPUT_DIR / "leetcode-solutions.parquet", "run `make base` first."),
+    ],
+    "instruct": [
+        (
+            loaders.OUTPUT_DIR / "leetcode-instruct-train.parquet",
+            "run `make instruct` first.",
+        ),
+        (
+            loaders.OUTPUT_DIR / "leetcode-instruct-test.parquet",
+            "run `make instruct` first.",
+        ),
+    ],
+    "evaluation": [
+        (
+            loaders.OUTPUT_DIR / "leetcode-evaluation.parquet",
+            "run `make evaluation` first.",
+        ),
+    ],
+}
 
 DEFAULT_COMMIT_MESSAGE = "Update dataset"
 
 
 def main() -> None:
     args = _parse_args()
-    _require_all_files()
+    datasets = args.datasets or list(_DATASET_FILES)
+    _require_files(datasets)
     api = HfApi()
-    operations = _build_commit_operations()
+    operations = _build_commit_operations(datasets)
     _commit_to_hub(api, operations, args.message)
     print(f"\nDone! https://huggingface.co/datasets/{REPO_ID}")
 
@@ -41,6 +61,14 @@ def _parse_args() -> argparse.Namespace:
         description="Upload the leetcode-solutions dataset to HuggingFace."
     )
     parser.add_argument(
+        "--datasets",
+        action="append",
+        choices=list(_DATASET_FILES),
+        dest="datasets",
+        metavar="DATASET",
+        help="Dataset(s) to upload: base, instruct, evaluation (repeatable; default: all).",
+    )
+    parser.add_argument(
         "--message",
         default=DEFAULT_COMMIT_MESSAGE,
         help="Commit message for the upload.",
@@ -51,35 +79,32 @@ def _parse_args() -> argparse.Namespace:
 # ---- Pre-flight checks ----
 
 
-def _require_all_files() -> None:
-    loaders.require_file(BASE_PARQUET_PATH, "run `make base` first.")
-    loaders.require_file(INSTRUCT_TRAIN_PATH, "run `make instruct` first.")
-    loaders.require_file(INSTRUCT_TEST_PATH, "run `make instruct` first.")
+def _require_files(datasets: list[str]) -> None:
     loaders.require_file(DATASET_CARD_PATH, "dataset_card/README.md is missing.")
+    for dataset in datasets:
+        for path, hint in _DATASET_FILES[dataset]:
+            loaders.require_file(path, hint)
 
 
 # ---- Upload ----
 
 
-def _build_commit_operations() -> list[CommitOperationAdd]:
-    return [
+def _build_commit_operations(datasets: list[str]) -> list[CommitOperationAdd]:
+    ops = [
         CommitOperationAdd(
             path_in_repo="README.md",
             path_or_fileobj=str(DATASET_CARD_PATH),
-        ),
-        CommitOperationAdd(
-            path_in_repo=BASE_PARQUET_PATH.name,
-            path_or_fileobj=str(BASE_PARQUET_PATH),
-        ),
-        CommitOperationAdd(
-            path_in_repo=INSTRUCT_TRAIN_PATH.name,
-            path_or_fileobj=str(INSTRUCT_TRAIN_PATH),
-        ),
-        CommitOperationAdd(
-            path_in_repo=INSTRUCT_TEST_PATH.name,
-            path_or_fileobj=str(INSTRUCT_TEST_PATH),
-        ),
+        )
     ]
+    for dataset in datasets:
+        for path, _ in _DATASET_FILES[dataset]:
+            ops.append(
+                CommitOperationAdd(
+                    path_in_repo=path.name,
+                    path_or_fileobj=str(path),
+                )
+            )
+    return ops
 
 
 def _commit_to_hub(

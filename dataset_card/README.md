@@ -59,7 +59,7 @@ ds = load_dataset("tkeskin/leetcode-solutions", "base")
 
 | Column              | Type   | Description                                                   |
 |---------------------|--------|---------------------------------------------------------------|
-| `code_snippet_id`   | int64  | LeetCode problem number                                       |
+| `parallel_id`       | int64  | LeetCode problem number                                       |
 | `title`             | string | Problem title                                                 |
 | `cpp`               | string | C++ solution (~3,495 problems)                                |
 | `java`              | string | Java solution (~3,371 problems)                               |
@@ -117,6 +117,13 @@ against the snippet's known input/output pairs.
 Only the test split is published (train rows are in the `instruct` config). The split
 boundary is identical to `instruct` — all pairs for a given snippet land on the same side.
 
+**ListNode/TreeNode support:** Problems whose parameters or return values are `ListNode`
+or `TreeNode` are now included. The node types are detected from the Python reference
+solution's type hints. The `execution_engine` builds nodes from level-order arrays (TreeNode)
+or value arrays (ListNode) before calling the solution, and compares results using
+round-trip `to_array()` comparison. Node class definitions are prepended automatically
+to the compiled code for C++ and Java targets.
+
 ```python
 from datasets import load_dataset
 ds = load_dataset("tkeskin/leetcode-solutions", "evaluation")
@@ -125,12 +132,12 @@ rows = ds["test"]
 
 | Column                                | Type   | Description                                                        |
 |---------------------------------------|--------|--------------------------------------------------------------------|
-| `code_snippet_id`                     | int64  | LeetCode problem number (matches `base`)                           |
+| `parallel_id`                         | int64  | LeetCode problem number (matches `base`)                           |
 | `source_language`                     | string | Language of the code to translate from (`cpp`, `java`, `python`)   |
 | `target_language`                     | string | Language to translate to (`cpp`, `java`, `python`)                 |
 | `user_prompt`                         | string | Natural-language instruction asking for the translation            |
 | `code_snippet_to_translate`           | string | Source-language code given to the model                            |
-| `expected_code_snippet_translation`   | string | Gold target-language translation (oracle-verified)                 |
+| `expected_code_snippet_translation`   | string | Expected target-language translation                               |
 | `execution_engine`                    | string | Target-language driver code that runs a translation on test inputs |
 | `expected_input_output_pairs`         | string | JSON-encoded `[{"input": [...], "expected": value}, ...]`          |
 | `difficulty`                          | string | Problem difficulty: `Easy`, `Medium`, or `Hard`                    |

@@ -47,14 +47,14 @@ def main() -> None:
         f"Splitting by code_snippet (test_frac={args.test_frac}, split_seed={args.split_seed}) ..."
     )
     train_frame, test_frame = splits.split_by_key(
-        instruct_frame, "code_snippet_id", args.test_frac, args.split_seed
+        instruct_frame, "parallel_id", args.test_frac, args.split_seed
     )
 
-    n_train_snippets = train_frame["code_snippet_id"].n_unique()
-    n_test_snippets = test_frame["code_snippet_id"].n_unique()
+    n_train_snippets = train_frame["parallel_id"].n_unique()
+    n_test_snippets = test_frame["parallel_id"].n_unique()
 
-    train_frame = train_frame.drop("code_snippet_id")
-    test_frame = test_frame.drop("code_snippet_id")
+    train_frame = train_frame.drop("parallel_id")
+    test_frame = test_frame.drop("parallel_id")
 
     loaders.write_parquet(train_frame, INSTRUCT_TRAIN_PATH)
     loaders.write_parquet(test_frame, INSTRUCT_TEST_PATH)
@@ -105,7 +105,7 @@ def _collect_instruct_rows(
                 continue
             rows.append(
                 _build_instruct_row(
-                    code_snippet_id=code_snippet["code_snippet_id"],
+                    parallel_id=code_snippet["parallel_id"],
                     source_language=source_language,
                     target_language=target_language,
                     source_code=source_code,
@@ -118,7 +118,7 @@ def _collect_instruct_rows(
 
 def _build_instruct_row(
     *,
-    code_snippet_id: int,
+    parallel_id: int,
     source_language: str,
     target_language: str,
     source_code: str,
@@ -126,7 +126,7 @@ def _build_instruct_row(
     instruction_rng: random.Random,
 ) -> dict:
     return {
-        "code_snippet_id": code_snippet_id,
+        "parallel_id": parallel_id,
         "instruction": generate_instruction(
             source_language, target_language, instruction_rng
         ),
@@ -137,7 +137,7 @@ def _build_instruct_row(
 
 def _build_instruct_frame(rows: list[dict]) -> pl.DataFrame:
     schema = {
-        "code_snippet_id": pl.Int64,
+        "parallel_id": pl.Int64,
         "instruction": pl.Utf8,
         "input": pl.Utf8,
         "output": pl.Utf8,

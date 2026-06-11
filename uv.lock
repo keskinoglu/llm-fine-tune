@@ -1094,6 +1094,7 @@ dependencies = [
     { name = "datasets", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "huggingface-hub", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "polars", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
+    { name = "tqdm", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
     { name = "transformers", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
 
@@ -1145,6 +1146,7 @@ requires-dist = [
     { name = "torchaudio", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
     { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'cuda'", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "llm-fine-tune", extra = "cuda" } },
     { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.2.4", conflict = { package = "llm-fine-tune", extra = "rocm" } },
+    { name = "tqdm", specifier = ">=4.66.0" },
     { name = "transformers", specifier = ">=4.55.0" },
 ]
 provides-extras = ["rocm", "cuda", "finetune", "evaluation"]

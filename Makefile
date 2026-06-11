@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: help lint lf commit cz bump base instruct evaluation dataset clean-data upload publish fertility finetune-sync test
+.PHONY: help lint lf commit cz bump base instruct evaluation datasets clean-data upload publish fertility finetune-sync test docker-build verify-engines-docker
 
 help:
 	@echo "Available commands:"
@@ -10,16 +10,19 @@ help:
 	@echo "  make commit          Run lint checks, then create a commitizen commit"
 	@echo "  make cz              Alias for 'make commit'"
 	@echo "  make bump            Bump the project version using commitizen"
-	@echo "  make base            Build and enrich the base Parquet dataset (--pull to update walkccc, --refresh to re-download HF sources)"
-	@echo "  make instruct        Build instruct-train.parquet and instruct-test.parquet (70/30 split) from base"
-	@echo "  make evaluation      Build leetcode-evaluation.parquet (held-out bigcode_task_payloads) from base"
-	@echo "  make dataset         Build base, instruct, and evaluation datasets"
+	@echo "  make base            Build the base Parquet dataset (--pull updates walkccc, --refresh re-downloads HF sources)"
+	@echo "  make instruct        Build instruct-train/test Parquet (70/30 split) from base"
+	@echo "  make evaluation      Build leetcode-evaluation Parquet (held-out bigcode_task_payloads) from base"
+	@echo "  make datasets        Build all three datasets"
 	@echo "  make clean-data      Remove the cloned source repo and generated output"
-	@echo "  make upload          Upload base + instruct-train + instruct-test + dataset card to HuggingFace"
-	@echo "  make publish         Build both datasets, then upload them (dataset + upload)"
-	@echo "  make test            Run unit tests (splits, newfacade matching)"
+	@echo "  make upload          Upload to HuggingFace (default: all). DATASET=base|instruct|evaluation to upload one"
+	@echo "  make publish         Build all datasets then upload all"
+	@echo "  make publish DATASET=base|instruct|evaluation  Build and upload one dataset"
+	@echo "  make test            Run unit tests"
 	@echo "  make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt"
 	@echo "  make finetune-sync   Rsync the finetune/ configs and scripts to the cluster (requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env)"
+	@echo "  make docker-build           Build the execution harness image (Python 3.11 + g++ + openjdk-17; ~500MB)"
+	@echo "  make verify-engines-docker  Validate expected code snippet translations (30-row sample). Use scripts/verify-engines for custom flags."
 
 lint:
 	uv run ruff check .
@@ -47,18 +50,29 @@ instruct:
 evaluation:
 	uv run python -m llm_fine_tune.dataset.build_evaluation_dataset
 
-dataset: base instruct evaluation
+datasets: base instruct evaluation
 
 clean-data:
 	rm -rf data/ output/
 
 upload:
-	uv run python -m llm_fine_tune.dataset.upload_dataset
+	uv run python -m llm_fine_tune.dataset.upload_dataset $(if $(DATASET),--datasets $(DATASET))
 
-publish: dataset upload
+publish:
+	$(MAKE) $(if $(DATASET),$(DATASET),datasets)
+	$(MAKE) upload $(if $(DATASET),DATASET=$(DATASET))
 
 test:
 	uv run pytest
+
+EXEC_IMAGE := llm-fine-tune-exec
+EXEC_DOCKERFILE := docker/execution-harness/Dockerfile
+
+docker-build:
+	docker build -t $(EXEC_IMAGE) -f $(EXEC_DOCKERFILE) .
+
+verify-engines-docker:
+	scripts/verify-engines --sample 30
 
 fertility:
 	uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility

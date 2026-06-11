@@ -7,17 +7,41 @@ the MultiPL-E toolchain container, then parsing the per-case OK/FAIL output.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 from typing import TypedDict
 
+from llm_fine_tune.execution_harness import datatypes
+
 _APPTAINER_IMAGE_ENV_VAR = "EVALUATION_SIF"
 _APPTAINER_IMAGE_DEFAULT = "evaluation.sif"
 
-_CPP_COMPILE_FLAGS = ["-O2", "-std=c++17", "-o", "{binary}", "{source}"]
-_JAVA_COMPILE_FLAGS = ["-d", "{outdir}", "{source}"]
+# LeetCode's Java environment provides javafx.util.Pair (gone from the JDK since 11).
+# walkccc solutions use its getKey()/getValue() API; ~5% of Java references need it.
+# Prepended only when the code doesn't define its own Pair (avoids a collision in the
+# model-evaluation path).
+_JAVA_PAIR_DEF = """
+class Pair<K, V> {
+    private final K key;
+    private final V value;
+    public Pair(K key, V value) { this.key = key; this.value = value; }
+    public K getKey() { return key; }
+    public V getValue() { return value; }
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Pair)) return false;
+        Pair<?, ?> p = (Pair<?, ?>) o;
+        return java.util.Objects.equals(key, p.key) && java.util.Objects.equals(value, p.value);
+    }
+    public int hashCode() { return java.util.Objects.hash(key, value); }
+    public String toString() { return "(" + key + ", " + value + ")"; }
+}
+"""
+
+_JAVA_DEFINES_PAIR = re.compile(r"\b(?:class|record|interface)\s+Pair\b")
 
 
 class ExecutionResult(TypedDict):
@@ -27,32 +51,52 @@ class ExecutionResult(TypedDict):
     runtime_ms: float | None
 
 
-def assemble_executable(
+def build_executable_code_snippet_from_llm_response(
     execution_engine: str,
     code_snippet_from_llm_response: str,
-    language: str,
+    target_language: str,
 ) -> str:
-    """Combine the model's code with the execution_engine into a compilable source string.
+    """Combine node definitions + model's code + execution_engine into a compilable source string.
 
     The resulting string is the executable_code_snippet_from_llm_response.
+    Prepends ListNode/TreeNode definitions when needed, and language boilerplate.
     """
-    if language == "python":
-        return code_snippet_from_llm_response + "\n" + execution_engine
-    elif language == "cpp":
+    definitions = datatypes.node_definitions(target_language)
+    body = code_snippet_from_llm_response + "\n" + execution_engine
+    if target_language == "cpp":
         return (
-            "#include <bits/stdc++.h>\n"
-            "using namespace std;\n\n"
-            + code_snippet_from_llm_response
+            "#include <bits/stdc++.h>\nusing namespace std;\n\n"
+            + definitions
             + "\n"
-            + execution_engine
+            + body
         )
-    elif language == "java":
-        return code_snippet_from_llm_response + "\n" + execution_engine
-    else:
-        raise ValueError(f"Unsupported language: {language!r}")
+    if target_language == "python":
+        # LeetCode solutions assume these are pre-imported (no explicit imports in submissions).
+        stdlib = (
+            "import bisect, collections, functools, heapq, itertools, math, string\n"
+            "from bisect import bisect_left, bisect_right, insort_left, insort_right\n"
+            "from collections import Counter, defaultdict, deque, OrderedDict\n"
+            "from functools import reduce, lru_cache, cache\n"
+            "from heapq import heappush, heappop, heapify, nlargest, nsmallest\n"
+            "from itertools import product, permutations, combinations, combinations_with_replacement, accumulate\n"
+            "from math import gcd, sqrt, log, floor, ceil, inf, factorial, isqrt\n"
+            "from typing import Dict, List, Optional, Set, Tuple\n"
+        )
+        return stdlib + "\n" + definitions + "\n" + body
+    if target_language == "java":
+        # walkccc/LeetCode Java assumes java.util.*, java.util.stream.*, and
+        # java.util.function.* are in scope (LeetCode auto-imports them).
+        imports = (
+            "import java.util.*;\n"
+            "import java.util.stream.*;\n"
+            "import java.util.function.*;\n\n"
+        )
+        pair = "" if _JAVA_DEFINES_PAIR.search(body) else _JAVA_PAIR_DEF
+        return imports + pair + definitions + "\n" + body
+    return definitions + "\n" + body
 
 
-def run(
+def execute(
     executable_code_snippet_from_llm_response: str,
     language: str,
     *,
@@ -66,13 +110,17 @@ def run(
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         if language == "python":
-            return _run_python(
+            return _execute_python(
                 executable_code_snippet_from_llm_response, tmp, timeout_s
             )
         elif language == "cpp":
-            return _run_cpp(executable_code_snippet_from_llm_response, tmp, timeout_s)
+            return _execute_cpp(
+                executable_code_snippet_from_llm_response, tmp, timeout_s
+            )
         elif language == "java":
-            return _run_java(executable_code_snippet_from_llm_response, tmp, timeout_s)
+            return _execute_java(
+                executable_code_snippet_from_llm_response, tmp, timeout_s
+            )
         else:
             raise ValueError(f"Unsupported language: {language!r}")
 
@@ -80,27 +128,27 @@ def run(
 # ---- Per-language runners ----
 
 
-def _run_python(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
+def _execute_python(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
     src_file = tmp / "solution.py"
     src_file.write_text(source)
-    return _execute(["python3", str(src_file)], timeout_s)
+    return _run_subprocess(["python3", str(src_file)], timeout_s)
 
 
-def _run_cpp(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
+def _execute_cpp(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
     src_file = tmp / "solution.cpp"
     binary = tmp / "solution"
     src_file.write_text(source)
 
     compile_result = _compile(
-        _in_container(["g++", "-O2", "-std=c++17", str(src_file), "-o", str(binary)])
+        _in_container(["g++", "-O2", "-std=c++20", str(src_file), "-o", str(binary)])
     )
     if not compile_result["compiled"]:
         return compile_result
 
-    return _execute(_in_container([str(binary)]), timeout_s)
+    return _run_subprocess(_in_container([str(binary)]), timeout_s)
 
 
-def _run_java(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
+def _execute_java(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
     src_file = tmp / "Solution.java"
     src_file.write_text(source)
 
@@ -108,7 +156,20 @@ def _run_java(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
     if not compile_result["compiled"]:
         return compile_result
 
-    return _execute(_in_container(["java", "-cp", str(tmp), "Main"]), timeout_s)
+    return _run_subprocess(
+        _in_container(
+            [
+                "java",
+                "-Xmx512m",
+                "-XX:+UseSerialGC",
+                "-XX:ActiveProcessorCount=1",
+                "-cp",
+                str(tmp),
+                "Main",
+            ]
+        ),
+        timeout_s,
+    )
 
 
 # ---- Subprocess helpers ----
@@ -139,7 +200,7 @@ def _compile(cmd: list[str]) -> ExecutionResult:
     }
 
 
-def _execute(cmd: list[str], timeout_s: float) -> ExecutionResult:
+def _run_subprocess(cmd: list[str], timeout_s: float) -> ExecutionResult:
     start = time.perf_counter()
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)

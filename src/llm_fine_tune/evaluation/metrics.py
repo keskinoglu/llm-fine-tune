@@ -5,7 +5,7 @@ Add a new metric by adding a function here and calling it from score.py.
 
 from __future__ import annotations
 
-from llm_fine_tune.evaluation.execution import ExecutionResult
+from llm_fine_tune.execution_harness.execution import ExecutionResult
 
 
 def measure_compilation_success(execution_result: ExecutionResult) -> float:
