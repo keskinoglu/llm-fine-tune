@@ -17,4 +17,9 @@ mkdir -p "$HF_HOME"
 export HF_DATASETS_CACHE="${SLURM_TMPDIR:-${TMPDIR:-/tmp}}/hf-datasets-${SLURM_JOB_ID:-$$}"
 mkdir -p "$HF_DATASETS_CACHE"
 
+# Apptainer caches + builds multi-GB image layers; keep them off /home.
+export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$(dirname "$REPO_DIR")/.cache/apptainer}"
+export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$APPTAINER_CACHEDIR/tmp}"
+mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"
+
 export FINETUNE_EXTRA=rocm
