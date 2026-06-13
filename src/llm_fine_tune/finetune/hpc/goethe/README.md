@@ -171,6 +171,12 @@ watch -n 1 'squeue -u $USER'
 ```
 Status codes: `PD` pending, `R` running, `CG` completing, `F` failed, `CA` cancelled, `TO` timed out
 
+**See when a pending job will start, or where it sits in the queue:**
+```bash
+squeue --start -j <JOBID>            # SLURM's estimated start time for one pending job
+squeue -p <partition> -t PD --sort=p # all pending jobs on a partition, highest priority first
+```
+
 **Get the log path for a running job:**
 ```bash
 scontrol show job <JOBID> | grep StdOut
