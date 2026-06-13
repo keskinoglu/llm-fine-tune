@@ -18,12 +18,12 @@
 #   tail -f evaluation_setup_<JOBID>.out
 
 #SBATCH --job-name=evaluation-setup
-#SBATCH --partition=test
+#SBATCH --partition=general1
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32g
-#SBATCH --time=03:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=evaluation_setup_%j.out
 #SBATCH --mail-type=FAIL
 
