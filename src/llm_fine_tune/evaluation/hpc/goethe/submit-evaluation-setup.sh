@@ -45,7 +45,8 @@ source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/goethe/env.sh"
 # ---------------------------------------------------------------------------
 echo "==> Installing evaluation extra (bigcode-eval + multipl-e) ..."
 cd "$REPO_DIR"
-uv sync --extra evaluation --verbose
+# rocm must stay so torch is a direct dep (routed to the ROCm index, not the CUDA default).
+uv sync --extra rocm --extra evaluation --verbose
 
 # ---------------------------------------------------------------------------
 # Build the Apptainer image
