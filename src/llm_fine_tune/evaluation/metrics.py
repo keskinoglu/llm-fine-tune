@@ -17,7 +17,7 @@ def measure_correctness(
     expected_input_output_pairs: list[dict],
 ) -> float:
     """Fraction of test cases where the generated code's output matches expected."""
-    generated = execution_result["input_output_pairs_from_llm_generated_code"]
+    generated = execution_result["input_output_pairs_from_code_snippet"]
     if not generated or not expected_input_output_pairs:
         return 0.0
     n = min(len(generated), len(expected_input_output_pairs))

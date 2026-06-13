@@ -7,7 +7,7 @@ import re
 _FENCE = re.compile(r"```[A-Za-z+#]*\n(.*?)```", re.DOTALL)
 
 
-def extract(llm_response: str, language: str) -> str:
+def extract_code_snippet_from_llm_response(llm_response: str, language: str) -> str:
     """Return the code_snippet_from_llm_response extracted from llm_response.
 
     Tries fenced blocks first (``` ... ```); falls back to the full response stripped.

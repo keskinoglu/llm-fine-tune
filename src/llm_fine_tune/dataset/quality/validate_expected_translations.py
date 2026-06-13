@@ -56,7 +56,7 @@ def _validate(
 
     Each row's expected code snippet translation is compiled and run
     independently, so the work parallelises cleanly across threads
-    (subprocess.run releases the GIL; each execute() gets its own tempdir).
+    (subprocess.run releases the GIL; each compile_and_run() gets its own tempdir).
     --fail-fast forces sequential order so the first failure is deterministic.
     """
     results: list[dict] = []
@@ -90,14 +90,18 @@ def check_row(row: dict, timeout_s: float) -> dict:
     """Build the expected code snippet translation + its engine, run it, classify the outcome."""
     target_language = row["target_language"]
     expected_input_output_pairs = json.loads(row["expected_input_output_pairs"])
-    executable = execution.build_executable_code_snippet_from_llm_response(
-        row["execution_engine"],
-        row["expected_code_snippet_translation"],
-        target_language,
+    code_snippet_with_execution_wiring = (
+        execution.assemble_code_snippet_with_execution_wiring(
+            row["expected_code_snippet_translation"],
+            row["execution_engine"],
+            target_language,
+        )
     )
-    result = execution.execute(executable, target_language, timeout_s=timeout_s)
+    result = execution.compile_and_run(
+        code_snippet_with_execution_wiring, target_language, timeout_s=timeout_s
+    )
 
-    produced = result["input_output_pairs_from_llm_generated_code"]
+    produced = result["input_output_pairs_from_code_snippet"]
     expected_n = len(expected_input_output_pairs)
     if not result["compiled"]:
         outcome = "compile_error"
@@ -119,7 +123,9 @@ def check_row(row: dict, timeout_s: float) -> dict:
     }
     if outcome != "passed":
         record["diagnostics"] = result["diagnostics"][:2000]
-        record["executable"] = executable
+        record["code_snippet_with_execution_wiring"] = (
+            code_snippet_with_execution_wiring
+        )
     return record
 
 

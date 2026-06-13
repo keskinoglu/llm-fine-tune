@@ -1088,7 +1088,7 @@ dependencies = [
 
 [[package]]
 name = "llm-fine-tune"
-version = "1.1.0"
+version = "1.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },

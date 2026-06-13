@@ -4,3 +4,5 @@ data/
 output/
 .env
 *.md
+!README.md
+!**/README.md

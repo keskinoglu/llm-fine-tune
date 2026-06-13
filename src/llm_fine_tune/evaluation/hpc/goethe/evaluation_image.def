@@ -13,14 +13,21 @@ Bootstrap: docker
 From: ghcr.io/bigcode-project/evaluation-harness-multiple
 
 %post
-    # Install the llm-fine-tune package (core + evaluation extra) so the
-    # evaluation modules (execution, score, report) are importable inside
-    # the container. bigcode-eval is already present in the base image.
-    pip install --no-cache-dir /opt/llm-fine-tune
+    # The execution sandbox only runs the executable_code_snippet_from_llm_response
+    # (g++/javac/python from the base image) and imports the evaluation modules.
+    # bigcode-eval + transformers/datasets are already in the base image, so install
+    # the package with --no-deps and add only the light runtime imports it pulls in
+    # (polars for loaders/report, tqdm). This keeps the .sif lean and avoids churning
+    # the base image's pinned ML stack.
+    pip install --no-cache-dir polars tqdm
+    pip install --no-cache-dir --no-deps /opt/llm-fine-tune
 
 %files
-    # Copy the repo into the image so pip install has a local source tree.
-    . /opt/llm-fine-tune
+    # Copy only what pip needs to build the package — not .venv/output/data/.git,
+    # which would bloat the build context and bake gigabytes into the .sif.
+    pyproject.toml /opt/llm-fine-tune/pyproject.toml
+    README.md /opt/llm-fine-tune/README.md
+    src /opt/llm-fine-tune/src
 
 %environment
     export PYTHONDONTWRITEBYTECODE=1

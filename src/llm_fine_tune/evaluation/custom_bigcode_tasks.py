@@ -33,7 +33,9 @@ class CodeSnippetTranslationTask(Task):
 
     def postprocess_generation(self, llm_response: str, i: int) -> str:
         target_language = self.get_dataset()[i]["target_language"]
-        return extractor.extract(llm_response, target_language)
+        return extractor.extract_code_snippet_from_llm_response(
+            llm_response, target_language
+        )
 
     def process_results(
         self, generations: list[list[str]], references: list[str]
@@ -55,12 +57,16 @@ class CodeSnippetTranslationTask(Task):
 
 def _score_single_sample(payload: dict, code_snippet_from_llm_response: str) -> dict:
     expected_input_output_pairs = json.loads(payload["expected_input_output_pairs"])
-    executable = execution.build_executable_code_snippet_from_llm_response(
-        payload["execution_engine"],
-        code_snippet_from_llm_response,
-        payload["target_language"],
+    code_snippet_with_execution_wiring = (
+        execution.assemble_code_snippet_with_execution_wiring(
+            code_snippet_from_llm_response,
+            payload["execution_engine"],
+            payload["target_language"],
+        )
     )
-    execution_result = execution.execute(executable, payload["target_language"])
+    execution_result = execution.compile_and_run(
+        code_snippet_with_execution_wiring, payload["target_language"]
+    )
     sample_scores = score.score(
         code_snippet_from_llm_response,
         execution_result,

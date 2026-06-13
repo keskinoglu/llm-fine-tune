@@ -1,8 +1,10 @@
-"""Assemble and run a code_snippet_from_llm_response with its execution_engine.
+"""Assemble a code_snippet with its execution_engine, then compile and run it.
 
 Generation (GPU node) and execution (Apptainer container) are separate steps on Goethe.
-This module handles the execution side: assembling the executable and running it via
-the MultiPL-E toolchain container, then parsing the per-case OK/FAIL output.
+This module handles the execution side: assembling the code_snippet_with_execution_wiring
+and running it via the MultiPL-E toolchain container, then parsing the per-case OK/FAIL
+output. The code_snippet is provenance-agnostic — the model's translation in eval, the
+reference in dataset validation.
 """
 
 from __future__ import annotations
@@ -47,30 +49,30 @@ _JAVA_DEFINES_PAIR = re.compile(r"\b(?:class|record|interface)\s+Pair\b")
 class ExecutionResult(TypedDict):
     compiled: bool
     diagnostics: str
-    input_output_pairs_from_llm_generated_code: list[dict]
+    input_output_pairs_from_code_snippet: list[dict]
     runtime_ms: float | None
 
 
-def build_executable_code_snippet_from_llm_response(
+def assemble_code_snippet_with_execution_wiring(
+    code_snippet: str,
     execution_engine: str,
-    code_snippet_from_llm_response: str,
-    target_language: str,
+    language: str,
 ) -> str:
-    """Combine node definitions + model's code + execution_engine into a compilable source string.
+    """Combine node definitions + the code_snippet + execution_engine into a compilable source string.
 
-    The resulting string is the executable_code_snippet_from_llm_response.
-    Prepends ListNode/TreeNode definitions when needed, and language boilerplate.
+    The resulting string is the code_snippet_with_execution_wiring. Prepends
+    ListNode/TreeNode definitions when needed, and language boilerplate.
     """
-    definitions = datatypes.node_definitions(target_language)
-    body = code_snippet_from_llm_response + "\n" + execution_engine
-    if target_language == "cpp":
+    definitions = datatypes.node_definitions(language)
+    body = code_snippet + "\n" + execution_engine
+    if language == "cpp":
         return (
             "#include <bits/stdc++.h>\nusing namespace std;\n\n"
             + definitions
             + "\n"
             + body
         )
-    if target_language == "python":
+    if language == "python":
         # LeetCode solutions assume these are pre-imported (no explicit imports in submissions).
         stdlib = (
             "import bisect, collections, functools, heapq, itertools, math, string\n"
@@ -83,7 +85,7 @@ def build_executable_code_snippet_from_llm_response(
             "from typing import Dict, List, Optional, Set, Tuple\n"
         )
         return stdlib + "\n" + definitions + "\n" + body
-    if target_language == "java":
+    if language == "java":
         # walkccc/LeetCode Java assumes java.util.*, java.util.stream.*, and
         # java.util.function.* are in scope (LeetCode auto-imports them).
         imports = (
@@ -96,13 +98,13 @@ def build_executable_code_snippet_from_llm_response(
     return definitions + "\n" + body
 
 
-def execute(
-    executable_code_snippet_from_llm_response: str,
+def compile_and_run(
+    code_snippet_with_execution_wiring: str,
     language: str,
     *,
     timeout_s: float = 10.0,
 ) -> ExecutionResult:
-    """Compile and run the executable_code_snippet_from_llm_response; return an ExecutionResult.
+    """Compile and run the code_snippet_with_execution_wiring; return an ExecutionResult.
 
     Runs inside the Apptainer image if EVALUATION_SIF is set; falls back to bare host for
     Python (unit-test convenience). C++/Java always require the container on Goethe.
@@ -110,17 +112,11 @@ def execute(
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         if language == "python":
-            return _execute_python(
-                executable_code_snippet_from_llm_response, tmp, timeout_s
-            )
+            return _execute_python(code_snippet_with_execution_wiring, tmp, timeout_s)
         elif language == "cpp":
-            return _execute_cpp(
-                executable_code_snippet_from_llm_response, tmp, timeout_s
-            )
+            return _execute_cpp(code_snippet_with_execution_wiring, tmp, timeout_s)
         elif language == "java":
-            return _execute_java(
-                executable_code_snippet_from_llm_response, tmp, timeout_s
-            )
+            return _execute_java(code_snippet_with_execution_wiring, tmp, timeout_s)
         else:
             raise ValueError(f"Unsupported language: {language!r}")
 
@@ -195,7 +191,7 @@ def _compile(cmd: list[str]) -> ExecutionResult:
     return {
         "compiled": True,
         "diagnostics": "",
-        "input_output_pairs_from_llm_generated_code": [],
+        "input_output_pairs_from_code_snippet": [],
         "runtime_ms": None,
     }
 
@@ -211,16 +207,16 @@ def _run_subprocess(cmd: list[str], timeout_s: float) -> ExecutionResult:
     if proc.returncode not in (0, 1):
         return _failed(proc.stderr or f"exit code {proc.returncode}")
 
-    pairs = _parse_output(proc.stdout)
+    pairs = _parse_execution_stdout(proc.stdout)
     return {
         "compiled": True,
         "diagnostics": proc.stderr,
-        "input_output_pairs_from_llm_generated_code": pairs,
+        "input_output_pairs_from_code_snippet": pairs,
         "runtime_ms": runtime_ms,
     }
 
 
-def _parse_output(stdout: str) -> list[dict]:
+def _parse_execution_stdout(stdout: str) -> list[dict]:
     """Parse OK/FAIL lines from the execution_engine's stdout."""
     pairs = []
     for line in stdout.splitlines():
@@ -236,6 +232,6 @@ def _failed(diagnostics: str) -> ExecutionResult:
     return {
         "compiled": False,
         "diagnostics": diagnostics,
-        "input_output_pairs_from_llm_generated_code": [],
+        "input_output_pairs_from_code_snippet": [],
         "runtime_ms": None,
     }

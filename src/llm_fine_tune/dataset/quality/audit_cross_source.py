@@ -95,11 +95,13 @@ def _check_row(row: dict, timeout_s: float) -> dict:
 def _run(
     engine: str, code: str, language: str, expected_pairs: list[dict], timeout_s: float
 ) -> str:
-    executable = execution.build_executable_code_snippet_from_llm_response(
-        engine, code, language
+    code_snippet_with_execution_wiring = (
+        execution.assemble_code_snippet_with_execution_wiring(code, engine, language)
     )
-    result = execution.execute(executable, language, timeout_s=timeout_s)
-    produced = result["input_output_pairs_from_llm_generated_code"]
+    result = execution.compile_and_run(
+        code_snippet_with_execution_wiring, language, timeout_s=timeout_s
+    )
+    produced = result["input_output_pairs_from_code_snippet"]
     if not result["compiled"]:
         return "compile_error"
     if len(produced) != len(expected_pairs):
