@@ -108,8 +108,8 @@ full = concatenate_datasets([ds["train"], ds["test"]])
 
 ### `evaluation`
 
-Held-out code-translation payloads for evaluating fine-tuned models via
-[bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness).
+Held-out code-translation payloads for execution-based evaluation of fine-tuned models (e.g. with
+[BigCode](https://github.com/bigcode-project/bigcode-evaluation-harness) or a custom runner).
 Each row is one directed translation pair (e.g. Python→C++) from the 30 % test split,
 enriched with a per-language `execution_engine` that compiles and runs a translation
 against the snippet's known input/output pairs.
