@@ -10,10 +10,10 @@
 #             No bigcode, no model, no network.
 #   Phase 3 — report     (ROCm venv): metrics.json -> per-sample parquet + summary.md.
 #
-# Usage (from $REPO_DIR), optionally with extra bigcode flags (e.g. --limit 20 for a shakeout):
+# Usage (from $REPO_DIR), optionally with extra generation flags (e.g. --limit 20 for a shakeout):
 #   cd "$REPO_DIR"
 #   sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh \
-#       "$WORK_DIR/saves/my-model-merged" [extra bigcode generation flags...]
+#       "$WORK_DIR/saves/my-model-merged" [extra generation flags...]
 #
 # Required env vars (set in ~/.bashrc):
 #   WORK_DIR  — e.g. /work/<group>/<user>
@@ -33,7 +33,7 @@ set -euo pipefail
 
 MODEL="${1:?
   No model path specified.
-  Usage: sbatch submit-evaluation.sh <path/to/merged-model> [extra bigcode flags...]
+  Usage: sbatch submit-evaluation.sh <path/to/merged-model> [extra generation flags...]
 }"
 shift
 GENERATION_FLAGS=("$@")  # passed through to generate-llm-responses (e.g. --limit 20)

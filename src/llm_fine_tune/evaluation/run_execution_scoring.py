@@ -29,8 +29,8 @@ def main() -> None:
         payload = payloads[i]
         generation_list = generations[i]
         llm_response = generation_list[0] if generation_list else ""
-        # Defensive: bigcode may save raw or already-postprocessed generations; extract
-        # is idempotent on a bare code_snippet (no fence → returns it stripped).
+        # generations hold the raw llm_response; extract pulls the code out (idempotent on
+        # already-bare code: no fence → returns it stripped).
         code_snippet_from_llm_response = (
             extractor.extract_code_snippet_from_llm_response(
                 llm_response, payload["target_language"]

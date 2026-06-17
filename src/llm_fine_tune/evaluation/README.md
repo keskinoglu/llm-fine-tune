@@ -1,9 +1,8 @@
 # Stage 5: Evaluation
 
-This directory drives the held-out **evaluation** config of the `parallel_corpus` through
-[bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness),
-measuring whether a model produces translations that actually **compile and run correctly** —
-not just whether they look plausible.
+This directory evaluates a model on the held-out **evaluation** config of the `parallel_corpus`,
+measuring whether its translations actually **compile and run correctly** — not just whether they
+look plausible. (We started on bigcode-evaluation-harness but moved off it — see the note below.)
 
 Each `bigcode_task_payload` is one `source_language` → `target_language` pair. The model receives a
 `code_snippet_to_translate`; we extract the `code_snippet_from_llm_response`, assemble it with the
@@ -16,11 +15,10 @@ payload's `execution_engine` into an `code_snippet_with_execution_wiring`, run i
 
 ```
 evaluation/
-  custom_bigcode_tasks.py     — CodeSnippetTranslationTask: bigcode task used for Phase-1 generation
-  run_bigcode_cli.py          — registers the task, then hands off to bigcode's CLI (run-bigcode-cli)
-  run_execution_scoring.py    — Phase-2 standalone scorer (no bigcode): generations + parquet → metrics
+  generate_llm_responses.py   — Phase 1: transformers generation → generations.json + evaluation.parquet
+  run_execution_scoring.py    — Phase 2: standalone scorer — generations + parquet → metrics.json
   extract_code_snippet_from_llm_response.py — strips prose/fences → code_snippet_from_llm_response
-  score.py                    — per-payload assemble+run+score (shared by the task and the scorer)
+  score.py                    — per-payload assemble+run+score (compiled, outcome, diagnostics, ...)
   metrics.py                  — individual measures (compiled, test_pass_rate, pass@1, runtime, loc)
   report.py                   — per-sample parquet + summary.md (evaluation-report)
   hpc/
@@ -37,21 +35,25 @@ The actual running of code lives one level up in [`execution_harness/`](../execu
 
 Generation needs a GPU and the full ML stack; running **untrusted model output** needs a locked-down
 sandbox. Those are different environments, so the cluster job
-([`hpc/goethe/submit-evaluation.sh`](hpc/goethe/submit-evaluation.sh)) splits them. Phase 1 uses
-bigcode's `--generation_only`; **Phase 2 does not use bigcode at all** — it's our own scorer, since
-running and grading is our code (bigcode is only needed to drive the model).
+([`hpc/goethe/submit-evaluation.sh`](hpc/goethe/submit-evaluation.sh)) splits them into three phases:
 
 | Phase | Where | What runs |
 |---|---|---|
-| **1 — generation** | GPU node, ROCm `.venv` | bigcode runs the model → `generations.json`; also dumps the evaluation `parquet` (network here) for Phase 2 to read offline |
+| **1 — generation** | GPU node, ROCm `.venv` | `generate-llm-responses` (transformers): model → `generations.json` + the evaluation `parquet`, from the same rows in order |
 | **2 — execution** | Apptainer sandbox, `--net --network none` | `run-execution-scoring`: for each row, `assemble_code_snippet_with_execution_wiring` → `compile_and_run` → `score` → per-sample `metrics.json` |
 | **3 — report** | login/compute, ROCm `.venv` | `evaluation-report` → `evaluation-results.parquet` + `summary.md` |
 
 Phase 2 is the security boundary: model-generated code is untrusted, so it executes with no outbound
-network (`--net --network none`, which works unprivileged here). Because Phase 2 dropped the bigcode
-dependency, the image is a small `python:3.11-slim` + `g++` + `openjdk-17` build (the same toolchain as
-the local [`docker/execution-harness/Dockerfile`](../../../docker/execution-harness/Dockerfile)) — no
-bigcode, no model, no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)).
+network (`--net --network none`, which works unprivileged here). The image is a small
+`python:3.11-slim` + `g++` + `openjdk-17` build (the same toolchain as the local
+[`docker/execution-harness/Dockerfile`](../../../docker/execution-harness/Dockerfile)) — no model,
+no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)).
+
+**Why not bigcode-evaluation-harness?** We started there, but its CLI isn't installable (the
+`main.py` is a repo-root script, not part of the package), its pinned commit is fragile against
+the venv's transformers 5.x, and — most fundamentally — execution + scoring for our custom
+`parallel_corpus` was always going to be *our* code (bigcode has no generic runner; you implement it
+per-task). So generation is plain transformers and Phase 2 is our own scorer; bigcode is unused.
 
 > **Why a `--sandbox` directory, not a `.sif`:** this account isn't in `/etc/subuid`, so apptainer
 > builds via `proot`. proot runs `%post` fine but can't exec `mksquashfs` (nested-proot `ptrace` is
@@ -108,23 +110,25 @@ apptainer exec --net --network none "$WORK_DIR/images/evaluation" g++ --version
 apptainer exec --net --network none "$WORK_DIR/images/evaluation" javac -version
 apptainer exec --net --network none "$WORK_DIR/images/evaluation" python -c "import llm_fine_tune.evaluation.run_execution_scoring"
 ```
-(Check `run_execution_scoring`, not `run_bigcode_cli` — the Phase-2 image deliberately has no bigcode.)
+(That third import is the Phase-2 entry point — the image has no model and no torch.)
+
+Run a 20-row shakeout first (`submit-evaluation.sh <model> --limit 20`) on `gpu_test` before
+committing the full ~3,300 payloads.
 
 ---
 
-## First-run checklist (pipeline is not yet verified end-to-end)
+## Reading the results
 
-The dataset-side execution path is validated (`validate-expected-translations` reaches ~72% feeding
-the `expected_code_snippet_translation` through the `execution_engine`), and Phase 2 is now our own
-code (no bigcode), so the remaining unknowns are confined to Phase 1. On the first run, watch for:
+The pipeline runs end-to-end: generation → sandbox execution → scoring → report. The dataset-side
+execution path is independently validated (`validate-expected-translations` reaches ~72% feeding the
+`expected_code_snippet_translation` through the `execution_engine`).
 
-- **bigcode generation flags.** Phase 1 uses `--generation_only --save_generations_path`. Confirm they
-  match the pinned bigcode version (`run-bigcode-cli --help`). Do the first run with a small `--limit`
-  (passed straight through, e.g. `submit-evaluation.sh <model> --limit 20`) on `gpu_test` before
-  committing the full ~3,300 payloads.
-- **generations ↔ payloads alignment.** The scorer pairs `generations.json[i]` with parquet row `i`.
-  Confirm bigcode writes generations in dataset order and that `--limit` truncates the head, so the
-  first N generations line up with the first N rows.
+- **`outcome`** classifies every row: `passed`, `wrong_output`, `compile_error`, `timeout`, or
+  **`redefinition`** — the soft failure where the model redefines a harness-provided `ListNode`/
+  `TreeNode` (a format issue the fine-tuned model should avoid; analyze it separately from real bugs).
+- **`diagnostics`** holds the truncated compiler/runtime stderr for any failed row.
+- **Alignment is structural:** `generate_llm_responses` writes `generations.json` and
+  `evaluation.parquet` from the same rows in order, so `generations[i]` ↔ parquet row `i`.
 
 ---
 

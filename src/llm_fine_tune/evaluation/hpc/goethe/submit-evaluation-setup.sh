@@ -41,12 +41,12 @@ set -euo pipefail
 source "$REPO_DIR/src/llm_fine_tune/finetune/hpc/goethe/env.sh"
 
 # ---------------------------------------------------------------------------
-# Install the evaluation extra into the existing venv
+# Install the ROCm stack into the venv (Phase-1 generation: torch + transformers)
 # ---------------------------------------------------------------------------
-echo "==> Installing evaluation extra (bigcode-eval + multipl-e) ..."
+echo "==> Installing the ROCm stack ..."
 cd "$REPO_DIR"
-# rocm must stay so torch is a direct dep (routed to the ROCm index, not the CUDA default).
-uv sync --extra rocm --extra evaluation --verbose
+# rocm so torch is a direct dep (routed to the ROCm index, not the CUDA default).
+uv sync --extra rocm --verbose
 
 # ---------------------------------------------------------------------------
 # Build the Apptainer image (--sandbox: a directory, not a .sif)

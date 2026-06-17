@@ -8,7 +8,7 @@ The project is organized as a pipeline of five stages:
 2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
 3. **Fine-tune** — Fine-tune the chosen base model on the `instruct` configuration using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on the Goethe-NHR cluster (AMD MI210 GPUs).
 4. **Publish the model** — Merge the LoRA adapter into the base weights and push the standalone fine-tuned model to [`tkeskin/llama-3.2-1b-instruct-code-translation`](https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation) on HuggingFace.
-5. **Evaluate** — Run the fine-tuned model against the held-out `evaluation` configuration through [bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness), measuring whether its translations compile and pass the `expected_input_output_pairs`.
+5. **Evaluate** — Run the fine-tuned model on the held-out `evaluation` configuration, executing each translation against its `expected_input_output_pairs` in a sandbox to measure whether it compiles and passes.
 
 The dataset has two configurations:
 
@@ -256,10 +256,9 @@ for the full merge + publish workflow including HF token requirements.
 ## Stage 5: Evaluate
 
 Measure whether the fine-tuned model produces translations that actually **compile and run** — not
-just plausible-looking code. The held-out `evaluation` configuration is driven through
-[bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness): the model
-translates each `code_snippet_to_translate`, and the resulting `code_snippet_from_llm_response` is
-assembled with the row's `execution_engine` and run against its `expected_input_output_pairs`.
+just plausible-looking code. The model translates each `code_snippet_to_translate`, and the resulting
+`code_snippet_from_llm_response` is assembled with the row's `execution_engine` and run against its
+`expected_input_output_pairs` in a network-isolated sandbox.
 
 Evaluation runs on the cluster in three phases — generation (GPU), sandboxed execution of untrusted
 model output (Apptainer, `--net --network none`), and reporting:

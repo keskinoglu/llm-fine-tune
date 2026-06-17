@@ -76,11 +76,6 @@ cuda = [
 finetune = [
     "llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git",
 ]
-# Evaluation stack. Install on Goethe only (bigcode-eval pulls heavy deps).
-# Pin the commit after Milestone 3 setup is verified on the cluster.
-evaluation = [
-    "bigcode-eval @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git",
-]
 
 [tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]

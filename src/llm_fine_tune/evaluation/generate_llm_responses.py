@@ -24,16 +24,15 @@ def _build_prompt(payload: dict) -> str:
     return f"{payload['user_prompt']}\n\n{payload['code_snippet_to_translate']}"
 
 
-def _encode(tokenizer, prompt: str):
+def _render_prompt(tokenizer, payload: dict) -> str:
+    prompt = _build_prompt(payload)
     if tokenizer.chat_template:
-        messages = [{"role": "user", "content": prompt}]
         return tokenizer.apply_chat_template(
-            messages,
+            [{"role": "user", "content": prompt}],
             add_generation_prompt=True,
-            return_tensors="pt",
-            return_dict=True,
+            tokenize=False,
         )
-    return tokenizer(prompt, return_tensors="pt")
+    return prompt
 
 
 def main() -> None:
@@ -44,6 +43,11 @@ def main() -> None:
         payloads = payloads[: args.limit]
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
+    # Decoder-only batching: pad on the left so the generated tokens are a clean suffix
+    # at the same offset for every row in the batch.
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16).to(
         "cuda"
     )
@@ -51,23 +55,25 @@ def main() -> None:
 
     gen_kwargs = {
         "max_new_tokens": args.max_new_tokens,
-        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+        "pad_token_id": tokenizer.pad_token_id,
     }
     if args.temperature and args.temperature > 0:
         gen_kwargs.update(do_sample=True, temperature=args.temperature)
     else:
         gen_kwargs.update(do_sample=False)
 
+    prompts = [_render_prompt(tokenizer, p) for p in payloads]
     generations = []
-    for payload in payloads:
-        inputs = _encode(tokenizer, _build_prompt(payload)).to(model.device)
-        input_length = inputs["input_ids"].shape[1]
+    for start in range(0, len(prompts), args.batch_size):
+        inputs = tokenizer(
+            prompts[start : start + args.batch_size],
+            return_tensors="pt",
+            padding=True,
+        ).to(model.device)
         with torch.no_grad():
             output = model.generate(**inputs, **gen_kwargs)
-        llm_response = tokenizer.decode(
-            output[0][input_length:], skip_special_tokens=True
-        )
-        generations.append([llm_response])
+        for sequence in output[:, inputs["input_ids"].shape[1] :]:
+            generations.append([tokenizer.decode(sequence, skip_special_tokens=True)])
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -88,6 +94,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument(
         "--limit", type=int, default=None, help="Only the first N payloads (shakeout)."
     )

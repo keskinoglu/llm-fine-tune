@@ -1,7 +1,7 @@
 """Compose all metric measures for one code_snippet_translation sample.
 
-No bigcode dependency — shared by the bigcode task (eval driver) and the standalone
-Phase-2 scorer (run_execution_scoring) that runs inside the --net --network none container.
+Used by the standalone Phase-2 scorer (run_execution_scoring) inside the
+--net --network none container.
 """
 
 from __future__ import annotations
@@ -38,8 +38,7 @@ def score_bigcode_task_payload(
 ) -> dict:
     """Assemble + run + score one bigcode_task_payload against its expected pairs.
 
-    Returns a per-sample record (identity columns + the score dict). This is the unit
-    both the bigcode task's process_results and the standalone scorer produce.
+    Returns a per-sample record (identity columns + the score dict) — one row of metrics.json.
     """
     expected_input_output_pairs = json.loads(payload["expected_input_output_pairs"])
     code_snippet_with_execution_wiring = (
@@ -63,7 +62,21 @@ def score_bigcode_task_payload(
         "target_language": payload["target_language"],
         "difficulty": payload.get("difficulty"),
         **sample_scores,
+        "outcome": _outcome(execution_result, sample_scores["test_pass_rate"]),
         # Compiler/runtime stderr, truncated — lets us see *why* a row failed without
         # bloating the parquet with C++ template spew.
         "diagnostics": execution_result["diagnostics"][:2000],
     }
+
+
+def _outcome(execution_result: ExecutionResult, test_pass_rate: float) -> str:
+    """Coarse failure bucket for analysis. `redefinition` is the soft failure where the model
+    redefines a harness-provided type (ListNode/TreeNode) — distinct from a real logic/compile bug."""
+    if execution_result["compiled"]:
+        return "passed" if test_pass_rate == 1.0 else "wrong_output"
+    diagnostics = execution_result["diagnostics"].lower()
+    if "redefinition" in diagnostics:
+        return "redefinition"
+    if "timed out" in diagnostics:
+        return "timeout"
+    return "compile_error"

@@ -208,21 +208,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bigcode-eval"
-version = "0.0.0"
-source = { git = "https://github.com/bigcode-project/bigcode-evaluation-harness.git#8fc5bae6479c4fbbb28c3f8b644f6a15b3f3b5bd" }
-dependencies = [
-    { name = "accelerate", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "datasets", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "evaluate", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "fsspec", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "huggingface-hub", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "mosestokenizer", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "pyext", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "transformers", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-
-[[package]]
 name = "brotli"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -549,12 +534,6 @@ wheels = [
 ]
 
 [[package]]
-name = "docopt"
-version = "0.6.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a2/55/8f8cab2afd404cf578136ef2cc5dfb50baa1761b68c9da1fb1e4eed343c9/docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491", size = 25901, upload-time = "2014-06-16T11:18:57.406Z" }
-
-[[package]]
 name = "docstring-parser"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -570,28 +549,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2c/77/850bef8d72ffb9219f0b1aac23fbc1bf7d038ee6ea666f331fa273031aa2/einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827", size = 56261, upload-time = "2026-01-26T04:13:17.638Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193", size = 65638, upload-time = "2026-01-26T04:13:18.546Z" },
-]
-
-[[package]]
-name = "evaluate"
-version = "0.4.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "datasets", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "dill", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "fsspec", extra = ["http"], marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "huggingface-hub", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "multiprocess", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "numpy", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "packaging", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "tqdm", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "xxhash", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/d0/0c17a8e6e8dc7245f22dea860557c32bae50fc4d287ae030cb0e8ab8720f/evaluate-0.4.6.tar.gz", hash = "sha256:e07036ca12b3c24331f83ab787f21cc2dbf3631813a1631e63e40897c69a3f21", size = 65716, upload-time = "2025-09-18T13:06:30.581Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/af/3e990d8d4002bbc9342adb4facd59506e653da93b2417de0fa6027cb86b1/evaluate-0.4.6-py3-none-any.whl", hash = "sha256:bca85bc294f338377b7ac2f861e21c308b11b2a285f510d7d5394d5df437db29", size = 84069, upload-time = "2025-09-18T13:06:29.265Z" },
 ]
 
 [[package]]
@@ -1105,9 +1062,6 @@ cuda = [
     { name = "torchaudio", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.21.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "sys_platform == 'linux'" },
 ]
-evaluation = [
-    { name = "bigcode-eval", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
 finetune = [
     { name = "llamafactory", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
 ]
@@ -1132,7 +1086,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bigcode-eval", marker = "extra == 'evaluation'", git = "https://github.com/bigcode-project/bigcode-evaluation-harness.git" },
     { name = "datasets", specifier = ">=4.0.0" },
     { name = "huggingface-hub", specifier = ">=0.32.0" },
     { name = "llamafactory", marker = "extra == 'finetune'", git = "https://github.com/hiyouga/LLaMA-Factory.git" },
@@ -1149,7 +1102,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.66.0" },
     { name = "transformers", specifier = ">=4.55.0" },
 ]
-provides-extras = ["rocm", "cuda", "finetune", "evaluation"]
+provides-extras = ["rocm", "cuda", "finetune"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1267,20 +1220,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fa/9e/9fd75db9797b9543ce78a646538a3c5537cb6adb015d128b4cbc2b4169e2/modelscope-1.37.1.tar.gz", hash = "sha256:7d9124970b4e53639bebe89f60473dee7d5a80589bf35bfbef4c839933cdaf93", size = 4594233, upload-time = "2026-05-22T05:57:09.621Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/f5/286dd2d21802e4954a28e73913af7bc79e882f23fcd98db2b5810fc590cf/modelscope-1.37.1-py3-none-any.whl", hash = "sha256:7f7af2dd37339188cbd3c18a858b1297b8a75222b9a0fbf176c7df8189cac39a", size = 6089945, upload-time = "2026-05-22T05:57:05.931Z" },
-]
-
-[[package]]
-name = "mosestokenizer"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docopt", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "openfile", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-    { name = "toolwrapper", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or (extra == 'extra-13-llm-fine-tune-cuda' and extra == 'extra-13-llm-fine-tune-rocm')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/12/cdc143b9e13c3f235ff10de86a16c8074982be6b5b22be9724603bb4872a/mosestokenizer-1.0.0.tar.gz", hash = "sha256:2d65a781add83e93612a5e491a2cfc9c3740048b8a028556a4e23fceb1a7d48a", size = 33749, upload-time = "2017-05-24T10:29:28.681Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/c6/913c968e5cbcaff6cdd2a54a1008330c01a573ecadcdf9f526058e3d33a0/mosestokenizer-1.0.0-py3-none-any.whl", hash = "sha256:4de94102c00ad21ea26c1d8327bf72d38288c6c83c9b2920fb9a86c66eddf8b7", size = 51182, upload-time = "2017-05-24T10:29:35.078Z" },
 ]
 
 [[package]]
@@ -1690,15 +1629,6 @@ wheels = [
 ]
 
 [[package]]
-name = "openfile"
-version = "0.0.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/46/6c8b936e55ace50a6d9ea722dd4b11a4996d58cff41690636a0d6f6f6718/openfile-0.0.7.tar.gz", hash = "sha256:ea4e8f19112049f578ec161b12f70c1113144988c0a488ab173a138b50f37479", size = 2199, upload-time = "2018-09-26T13:16:48.207Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/e6/805db6867faacb488b44ba8e0829ef4de151dd0499f3c5da5f4ad11698a7/openfile-0.0.7-py3-none-any.whl", hash = "sha256:d21b69dba1306c9dd397a44fd8f4fa8a83812f1d935c409085e8a25c411d16ec", size = 2355, upload-time = "2018-09-26T13:17:13.226Z" },
-]
-
-[[package]]
 name = "orjson"
 version = "3.11.9"
 source = { registry = "https://pypi.org/simple" }
@@ -2077,12 +2007,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/fe/9a/e6bca0eed82db2656
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a6/53/d78dc063216e62fc55f6b2eebb447f6a4b0a59f55c8406376f76bf959b08/pydub-0.25.1-py2.py3-none-any.whl", hash = "sha256:65617e33033874b59d87db603aa1ed450633288aefead953b30bded59cb599a6", size = 32327, upload-time = "2021-03-10T02:09:53.503Z" },
 ]
-
-[[package]]
-name = "pyext"
-version = "0.5"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2d/92/1db296a5071a2cf25e8976370d46649070ec4a70526f94c8ffc76d3dd891/pyext-0.5.tar.gz", hash = "sha256:0d6b843b5864a28619b526b0910e7582e985e730db6ea179f161e9b6b5a1035c", size = 6682, upload-time = "2014-01-29T23:19:09.294Z" }
 
 [[package]]
 name = "pygments"
@@ -2585,12 +2509,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/cc/18/0bbf3884e9eaa3881
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/75/8539d011f6be8e29f339c42e633aae3cb73bffa95dd0f9adec09b9c58e85/tomlkit-0.13.3-py3-none-any.whl", hash = "sha256:c89c649d79ee40629a9fda55f8ace8c6a1b42deb912b2a8fd8d942ddadb606b0", size = 38901, upload-time = "2025-06-05T07:13:43.546Z" },
 ]
-
-[[package]]
-name = "toolwrapper"
-version = "2.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/41/7b/34bf8fb69426d8a18bcc61081e9d126f4fcd41c3c832072bef39af1602cd/toolwrapper-2.1.0.tar.gz", hash = "sha256:128088c93cb02fcaa6701c488e62e027f45ca5597b5c9bcf28816ad70e830bf7", size = 3202, upload-time = "2020-05-13T04:18:05.65Z" }
 
 [[package]]
 name = "torch"
