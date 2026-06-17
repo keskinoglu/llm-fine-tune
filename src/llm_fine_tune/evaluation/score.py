@@ -63,4 +63,7 @@ def score_bigcode_task_payload(
         "target_language": payload["target_language"],
         "difficulty": payload.get("difficulty"),
         **sample_scores,
+        # Compiler/runtime stderr, truncated — lets us see *why* a row failed without
+        # bloating the parquet with C++ template spew.
+        "diagnostics": execution_result["diagnostics"][:2000],
     }
