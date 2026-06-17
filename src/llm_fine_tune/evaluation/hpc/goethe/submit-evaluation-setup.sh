@@ -54,7 +54,7 @@ uv sync --extra rocm --extra evaluation --verbose
 IMAGES_DIR="$WORK_DIR/images"
 mkdir -p "$IMAGES_DIR"
 
-echo "==> Building evaluation.sif (pulls ghcr.io/bigcode-project/evaluation-harness-multiple) ..."
+echo "==> Building evaluation.sif (python:3.11-slim + g++ + openjdk-17; minutes, not hours) ..."
 apptainer build \
     "$IMAGES_DIR/evaluation.sif" \
     "$REPO_DIR/src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def"

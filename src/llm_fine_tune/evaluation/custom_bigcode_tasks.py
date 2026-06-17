@@ -6,11 +6,8 @@ generate → execute → score pipeline. Imported only by run_bigcode_cli.py.
 
 from __future__ import annotations
 
-import json
-
 from bigcode_eval.base import Task
 
-from llm_fine_tune.execution_harness import execution
 from llm_fine_tune.evaluation import score
 from llm_fine_tune.evaluation import extract_code_snippet_from_llm_response as extractor
 
@@ -41,7 +38,7 @@ class CodeSnippetTranslationTask(Task):
         self, generations: list[list[str]], references: list[str]
     ) -> dict:
         records = [
-            _score_single_sample(
+            score.score_bigcode_task_payload(
                 self.get_dataset()[i],
                 generation_list[0] if generation_list else "",
             )
@@ -53,32 +50,6 @@ class CodeSnippetTranslationTask(Task):
 
 
 # ---- Helpers ----
-
-
-def _score_single_sample(payload: dict, code_snippet_from_llm_response: str) -> dict:
-    expected_input_output_pairs = json.loads(payload["expected_input_output_pairs"])
-    code_snippet_with_execution_wiring = (
-        execution.assemble_code_snippet_with_execution_wiring(
-            code_snippet_from_llm_response,
-            payload["execution_engine"],
-            payload["target_language"],
-        )
-    )
-    execution_result = execution.compile_and_run(
-        code_snippet_with_execution_wiring, payload["target_language"]
-    )
-    sample_scores = score.score(
-        code_snippet_from_llm_response,
-        execution_result,
-        expected_input_output_pairs,
-    )
-    return {
-        "parallel_id": payload["parallel_id"],
-        "source_language": payload["source_language"],
-        "target_language": payload["target_language"],
-        "difficulty": payload.get("difficulty"),
-        **sample_scores,
-    }
 
 
 def _aggregate(records: list[dict]) -> dict:

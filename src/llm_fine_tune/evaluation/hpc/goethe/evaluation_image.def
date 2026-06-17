@@ -1,33 +1,34 @@
-# Apptainer build recipe for the evaluation container.
+# Apptainer build recipe for the Phase-2 execution sandbox.
 #
-# Extends the MultiPL-E toolchain image (which has g++, javac, java, python3)
-# with the llm-fine-tune package so the evaluation core is importable.
+# Phase 2 only compiles + runs the executable code (g++ / javac / python3) and scores it —
+# it does NOT run the model and does NOT need bigcode (that's Phase 1, in the ROCm venv).
+# So we base on a small python:3.11 image instead of bigcode's ~20-language MultiPL-E image,
+# which built in hours on PanFS. This builds in minutes and matches the package's Python.
 #
-# Build (on a node with internet access, from $REPO_DIR):
+# Build (on a compute node, from $REPO_DIR):
 #   apptainer build "$WORK_DIR/images/evaluation.sif" \
 #       src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def
 #
-# The container is --net none at run time (no outbound network during execution).
+# Run at evaluation time with --net none (no outbound network during execution).
 
 Bootstrap: docker
-From: ghcr.io/bigcode-project/evaluation-harness-multiple
-
-%post
-    # The execution sandbox only runs the executable_code_snippet_from_llm_response
-    # (g++/javac/python from the base image) and imports the evaluation modules.
-    # bigcode-eval + transformers/datasets are already in the base image, so install
-    # the package with --no-deps and add only the light runtime imports it pulls in
-    # (polars for loaders/report, tqdm). This keeps the .sif lean and avoids churning
-    # the base image's pinned ML stack.
-    pip install --no-cache-dir polars tqdm
-    pip install --no-cache-dir --no-deps /opt/llm-fine-tune
+From: python:3.11-slim-bookworm
 
 %files
-    # Copy only what pip needs to build the package — not .venv/output/data/.git,
-    # which would bloat the build context and bake gigabytes into the .sif.
+    # Only what pip needs to build the package — not .venv/output/data/.git.
     pyproject.toml /opt/llm-fine-tune/pyproject.toml
     README.md /opt/llm-fine-tune/README.md
     src /opt/llm-fine-tune/src
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends \
+        g++ \
+        openjdk-17-jdk-headless \
+        && rm -rf /var/lib/apt/lists/*
+    # polars: read the evaluation parquet in the Phase-2 scorer. tqdm: light import.
+    pip install --no-cache-dir polars tqdm
+    # --no-deps: the scorer's import chain is polars + execution harness + stdlib only.
+    pip install --no-cache-dir --no-deps /opt/llm-fine-tune
 
 %environment
     export PYTHONDONTWRITEBYTECODE=1

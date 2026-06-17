@@ -16,10 +16,11 @@ payload's `execution_engine` into an `code_snippet_with_execution_wiring`, run i
 
 ```
 evaluation/
-  custom_bigcode_tasks.py     — CodeSnippetTranslationTask: registers our task with bigcode
+  custom_bigcode_tasks.py     — CodeSnippetTranslationTask: bigcode task used for Phase-1 generation
   run_bigcode_cli.py          — registers the task, then hands off to bigcode's CLI (run-bigcode-cli)
+  run_execution_scoring.py    — Phase-2 standalone scorer (no bigcode): generations + parquet → metrics
   extract_code_snippet_from_llm_response.py — strips prose/fences → code_snippet_from_llm_response
-  score.py                    — composes the metric measures for one bigcode_task_payload
+  score.py                    — per-payload assemble+run+score (shared by the task and the scorer)
   metrics.py                  — individual measures (compiled, test_pass_rate, pass@1, runtime, loc)
   report.py                   — per-sample parquet + summary.md (evaluation-report)
   hpc/
@@ -34,20 +35,24 @@ The actual running of code lives one level up in [`execution_harness/`](../execu
 
 ## The three-phase split (and why)
 
-Generation needs a GPU and the full ML stack; running untranslated **untrusted model output** needs
-a locked-down sandbox. Those are different environments, so the cluster job
-([`hpc/goethe/submit-evaluation.sh`](hpc/goethe/submit-evaluation.sh)) splits them — bigcode supports
-this natively via `--generation_only` / `--load_generations_path`:
+Generation needs a GPU and the full ML stack; running **untrusted model output** needs a locked-down
+sandbox. Those are different environments, so the cluster job
+([`hpc/goethe/submit-evaluation.sh`](hpc/goethe/submit-evaluation.sh)) splits them. Phase 1 uses
+bigcode's `--generation_only`; **Phase 2 does not use bigcode at all** — it's our own scorer, since
+running and grading is our code (bigcode is only needed to drive the model).
 
 | Phase | Where | What runs |
 |---|---|---|
-| **1 — generation** | GPU node, ROCm `.venv` | Model produces `llm_response` for every `bigcode_task_payload` → `generations.json` |
-| **2 — execution** | Apptainer `.sif`, `--net none` | Compile + run each `code_snippet_with_execution_wiring`, score → `metrics.json` |
+| **1 — generation** | GPU node, ROCm `.venv` | bigcode runs the model → `generations.json`; also dumps the evaluation `parquet` (network here) for Phase 2 to read offline |
+| **2 — execution** | Apptainer `.sif`, `--net none` | `run-execution-scoring`: for each row, `assemble_code_snippet_with_execution_wiring` → `compile_and_run` → `score` → per-sample `metrics.json` |
 | **3 — report** | login/compute, ROCm `.venv` | `evaluation-report` → `evaluation-results.parquet` + `summary.md` |
 
 Phase 2 is the security boundary: model-generated code is untrusted, so it executes inside the
-container with no network. The `.sif` carries only `g++`/`javac`/`python` and the evaluation modules
-— no model, no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)).
+container with no network. Because Phase 2 dropped the bigcode dependency, the `.sif` is a small
+`python:3.11-slim` + `g++` + `openjdk-17` image (the same toolchain as the local
+[`docker/execution-harness/Dockerfile`](../../../docker/execution-harness/Dockerfile)) — no bigcode,
+no model, no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)). It
+builds in minutes, not the hours the full MultiPL-E image took on PanFS.
 
 ---
 
@@ -96,24 +101,25 @@ After building the `.sif`, sanity-check it before spending a GPU job:
 ```bash
 apptainer exec "$WORK_DIR/images/evaluation.sif" g++ --version
 apptainer exec "$WORK_DIR/images/evaluation.sif" javac -version
-apptainer exec "$WORK_DIR/images/evaluation.sif" python -c "import llm_fine_tune.evaluation.run_bigcode_cli"
+apptainer exec "$WORK_DIR/images/evaluation.sif" python -c "import llm_fine_tune.evaluation.run_execution_scoring"
 ```
+(Check `run_execution_scoring`, not `run_bigcode_cli` — the Phase-2 image deliberately has no bigcode.)
 
 ---
 
 ## First-run checklist (pipeline is not yet verified end-to-end)
 
 The dataset-side execution path is validated (`validate-expected-translations` reaches ~72% feeding
-the `expected_code_snippet_translation` through the `execution_engine`), but the **bigcode glue** —
-generation, `extract`, and the `metrics.json` → report handoff — has never run against a real model.
-On the first run, watch for:
+the `expected_code_snippet_translation` through the `execution_engine`), and Phase 2 is now our own
+code (no bigcode), so the remaining unknowns are confined to Phase 1. On the first run, watch for:
 
-- **bigcode flag names.** Phase 1 uses `--generation_only --save_generations_path`; Phase 2 uses
-  `--load_generations_path --metric_output_path --allow_code_execution`. Confirm they match the
-  pinned bigcode version (`run-bigcode-cli --help`). Do the first run with a small `--limit` to shake
-  this out on `gpu_test` (30 min) before committing the full ~3,300 payloads.
-- **`metrics.json` shape.** bigcode nests `process_results` output under the task name; confirm
-  `evaluation-report --results-json` reads what bigcode actually writes.
+- **bigcode generation flags.** Phase 1 uses `--generation_only --save_generations_path`. Confirm they
+  match the pinned bigcode version (`run-bigcode-cli --help`). Do the first run with a small `--limit`
+  (passed straight through, e.g. `submit-evaluation.sh <model> --limit 20`) on `gpu_test` before
+  committing the full ~3,300 payloads.
+- **generations ↔ payloads alignment.** The scorer pairs `generations.json[i]` with parquet row `i`.
+  Confirm bigcode writes generations in dataset order and that `--limit` truncates the head, so the
+  first N generations line up with the first N rows.
 
 ---
 
