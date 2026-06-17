@@ -28,9 +28,12 @@ def _encode(tokenizer, prompt: str):
     if tokenizer.chat_template:
         messages = [{"role": "user", "content": prompt}]
         return tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt"
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
         )
-    return tokenizer(prompt, return_tensors="pt").input_ids
+    return tokenizer(prompt, return_tensors="pt")
 
 
 def main() -> None:
@@ -41,9 +44,9 @@ def main() -> None:
         payloads = payloads[: args.limit]
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model, torch_dtype=torch.bfloat16
-    ).to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16).to(
+        "cuda"
+    )
     model.eval()
 
     gen_kwargs = {
@@ -57,11 +60,12 @@ def main() -> None:
 
     generations = []
     for payload in payloads:
-        input_ids = _encode(tokenizer, _build_prompt(payload)).to(model.device)
+        inputs = _encode(tokenizer, _build_prompt(payload)).to(model.device)
+        input_length = inputs["input_ids"].shape[1]
         with torch.no_grad():
-            output = model.generate(input_ids, **gen_kwargs)
+            output = model.generate(**inputs, **gen_kwargs)
         llm_response = tokenizer.decode(
-            output[0][input_ids.shape[1] :], skip_special_tokens=True
+            output[0][input_length:], skip_special_tokens=True
         )
         generations.append([llm_response])
 
