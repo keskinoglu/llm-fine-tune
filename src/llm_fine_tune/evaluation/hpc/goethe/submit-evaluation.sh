@@ -64,8 +64,8 @@ echo ""
 echo "==> Phase 1: generating translations ..."
 source "$REPO_DIR/.venv/bin/activate"
 
-# Writes generations.json + evaluation.parquet into RESULTS_DIR from the same rows, in order.
-generate-llm-responses \
+# generations.json + evaluation.parquet come from the same rows in order, so Phase 2 can pair by index.
+python -m llm_fine_tune.evaluation.generate_llm_responses \
     --model "$MODEL" \
     --output-dir "$RESULTS_DIR" \
     --max-new-tokens 512 \
