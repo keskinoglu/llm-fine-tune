@@ -1,15 +1,14 @@
 # Apptainer build recipe for the Phase-2 execution sandbox.
 #
-# Phase 2 only compiles + runs the executable code (g++ / javac / python3) and scores it —
-# it does NOT run the model and does NOT need bigcode (that's Phase 1, in the ROCm venv).
-# So we base on a small python:3.11 image instead of bigcode's ~20-language MultiPL-E image,
-# which built in hours on PanFS. This builds in minutes and matches the package's Python.
+# Phase 2 only compiles + runs code (g++/javac/python3) and scores it — no model, no bigcode
+# (that's Phase 1). Hence a small python:3.11 base, not bigcode's heavy MultiPL-E image.
 #
-# Build (on a compute node, from $REPO_DIR):
-#   apptainer build "$WORK_DIR/images/evaluation.sif" \
+# Build (on a compute node, from $REPO_DIR) — --sandbox (directory), since this account can't
+# pack a .sif under proot (no /etc/subuid; mksquashfs fails). See submit-evaluation-setup.sh.
+#   apptainer build --sandbox "$WORK_DIR/images/evaluation" \
 #       src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def
 #
-# Run at evaluation time with --net none (no outbound network during execution).
+# Run at evaluation time with --net --network none (no outbound network during execution).
 
 Bootstrap: docker
 From: python:3.11-slim-bookworm

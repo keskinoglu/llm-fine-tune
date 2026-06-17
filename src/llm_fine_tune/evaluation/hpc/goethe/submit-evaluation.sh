@@ -5,7 +5,7 @@
 # generated code never touches the network:
 #   Phase 1 — generation (GPU, ROCm venv): bigcode produces generations.json; we also dump
 #             the evaluation parquet here (network available) so Phase 2 can read it offline.
-#   Phase 2 — execution  (Apptainer, --net none): the standalone scorer compiles + runs each
+#   Phase 2 — execution  (Apptainer, --net --network none): the standalone scorer compiles + runs each
 #             code_snippet against its execution_engine and writes per-sample metrics.json.
 #             No bigcode, no model, no network.
 #   Phase 3 — report     (ROCm venv): metrics.json -> per-sample parquet + summary.md.
@@ -41,7 +41,7 @@ GENERATION_FLAGS=("$@")  # passed through to run-bigcode-cli (e.g. --limit 20)
 : "${WORK_DIR:?WORK_DIR is not set — export WORK_DIR=/work/<group>/<user> in ~/.bashrc}"
 : "${REPO_DIR:?REPO_DIR is not set — export REPO_DIR=\$WORK_DIR/llm-fine-tune in ~/.bashrc}"
 
-EVALUATION_SIF="${WORK_DIR}/images/evaluation.sif"
+EVALUATION_IMAGE="${WORK_DIR}/images/evaluation"  # --sandbox directory (mksquashfs unavailable under proot)
 RESULTS_DIR="${WORK_DIR}/evaluation-results/$(basename "$MODEL")-${SLURM_JOB_ID}"
 GENERATIONS_FILE="${RESULTS_DIR}/generations.json"
 EVALUATION_PARQUET="${RESULTS_DIR}/evaluation.parquet"
@@ -55,7 +55,7 @@ mkdir -p "$RESULTS_DIR"
 
 echo "==> Model:        $MODEL"
 echo "==> Results dir:  $RESULTS_DIR"
-echo "==> SIF image:    $EVALUATION_SIF"
+echo "==> Image:        $EVALUATION_IMAGE"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -84,13 +84,13 @@ load_dataset('tkeskin/leetcode-solutions', 'evaluation')['test'].to_parquet('$EV
 deactivate
 
 # ---------------------------------------------------------------------------
-# Phase 2: execution + scoring (Apptainer, --net none, no bigcode)
+# Phase 2: execution + scoring (Apptainer, --net --network none, no bigcode)
 # ---------------------------------------------------------------------------
-# --cleanenv so host env (e.g. EVALUATION_SIF) doesn't leak in; g++/javac run directly
-# inside the container. --bind the results dir since /work isn't auto-mounted.
+# --net --network none: no outbound network for untrusted code. --cleanenv: keep host env out.
+# --bind: /work isn't auto-mounted.
 echo "==> Phase 2: executing + scoring translations in container ..."
 
-apptainer exec --net none --cleanenv --bind "$RESULTS_DIR" "$EVALUATION_SIF" \
+apptainer exec --net --network none --cleanenv --bind "$RESULTS_DIR" "$EVALUATION_IMAGE" \
     python -m llm_fine_tune.evaluation.run_execution_scoring \
         --generations-json "$GENERATIONS_FILE" \
         --evaluation-parquet "$EVALUATION_PARQUET" \

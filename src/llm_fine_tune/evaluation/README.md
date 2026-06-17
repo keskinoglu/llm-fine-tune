@@ -44,15 +44,20 @@ running and grading is our code (bigcode is only needed to drive the model).
 | Phase | Where | What runs |
 |---|---|---|
 | **1 — generation** | GPU node, ROCm `.venv` | bigcode runs the model → `generations.json`; also dumps the evaluation `parquet` (network here) for Phase 2 to read offline |
-| **2 — execution** | Apptainer `.sif`, `--net none` | `run-execution-scoring`: for each row, `assemble_code_snippet_with_execution_wiring` → `compile_and_run` → `score` → per-sample `metrics.json` |
+| **2 — execution** | Apptainer sandbox, `--net --network none` | `run-execution-scoring`: for each row, `assemble_code_snippet_with_execution_wiring` → `compile_and_run` → `score` → per-sample `metrics.json` |
 | **3 — report** | login/compute, ROCm `.venv` | `evaluation-report` → `evaluation-results.parquet` + `summary.md` |
 
-Phase 2 is the security boundary: model-generated code is untrusted, so it executes inside the
-container with no network. Because Phase 2 dropped the bigcode dependency, the `.sif` is a small
-`python:3.11-slim` + `g++` + `openjdk-17` image (the same toolchain as the local
-[`docker/execution-harness/Dockerfile`](../../../docker/execution-harness/Dockerfile)) — no bigcode,
-no model, no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)). It
-builds in minutes, not the hours the full MultiPL-E image took on PanFS.
+Phase 2 is the security boundary: model-generated code is untrusted, so it executes with no outbound
+network (`--net --network none`, which works unprivileged here). Because Phase 2 dropped the bigcode
+dependency, the image is a small `python:3.11-slim` + `g++` + `openjdk-17` build (the same toolchain as
+the local [`docker/execution-harness/Dockerfile`](../../../docker/execution-harness/Dockerfile)) — no
+bigcode, no model, no torch (see [`hpc/goethe/evaluation_image.def`](hpc/goethe/evaluation_image.def)).
+
+> **Why a `--sandbox` directory, not a `.sif`:** this account isn't in `/etc/subuid`, so apptainer
+> builds via `proot`. proot runs `%post` fine but can't exec `mksquashfs` (nested-proot `ptrace` is
+> denied on these nodes), so packing a `.sif` FATALs. `--sandbox` leaves the rootfs as a directory,
+> which `apptainer exec` runs directly — skipping `mksquashfs` entirely. The proper fix is to ask
+> support for `/etc/subuid`+`/etc/subgid` entries (enables `apptainer build --fakeroot` → real `.sif`).
 
 ---
 
@@ -83,7 +88,7 @@ Prerequisites: the full repo at `$REPO_DIR`, `WORK_DIR`/`REPO_DIR` exported in `
 ```bash
 cd "$REPO_DIR"
 
-# One-time: install the evaluation extra + build evaluation.sif (compute node — needs network)
+# One-time: install the evaluation extra + build the --sandbox image (compute node — needs network)
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation-setup.sh
 
 # Baseline: evaluate the un-fine-tuned model (pass an HF id directly)
@@ -96,12 +101,12 @@ sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh "$WORK_DIR/s
 Results land in `$WORK_DIR/evaluation-results/<model>-<jobid>/` as `evaluation-results.parquet` and
 `summary.md`. The baseline-vs-tuned comparison of those summaries is the project's conclusion.
 
-After building the `.sif`, sanity-check it before spending a GPU job:
+After building the image, sanity-check it before spending a GPU job:
 
 ```bash
-apptainer exec "$WORK_DIR/images/evaluation.sif" g++ --version
-apptainer exec "$WORK_DIR/images/evaluation.sif" javac -version
-apptainer exec "$WORK_DIR/images/evaluation.sif" python -c "import llm_fine_tune.evaluation.run_execution_scoring"
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" g++ --version
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" javac -version
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" python -c "import llm_fine_tune.evaluation.run_execution_scoring"
 ```
 (Check `run_execution_scoring`, not `run_bigcode_cli` — the Phase-2 image deliberately has no bigcode.)
 

@@ -2,7 +2,7 @@
 
 Standalone — no bigcode. Reads the Phase-1 generations and the evaluation parquet, pairs
 them by row order, and writes the per-sample metrics JSON that evaluation-report consumes.
-Runs inside the --net none container, so it loads the dataset from a local parquet (no Hub
+Runs inside the --net --network none container, so it loads the dataset from a local parquet (no Hub
 access) and imports nothing heavier than polars + the execution harness.
 """
 

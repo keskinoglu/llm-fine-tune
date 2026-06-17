@@ -1,7 +1,7 @@
 """Compose all metric measures for one code_snippet_translation sample.
 
 No bigcode dependency — shared by the bigcode task (eval driver) and the standalone
-Phase-2 scorer (run_execution_scoring) that runs inside the --net none container.
+Phase-2 scorer (run_execution_scoring) that runs inside the --net --network none container.
 """
 
 from __future__ import annotations

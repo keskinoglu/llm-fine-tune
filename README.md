@@ -262,7 +262,7 @@ translates each `code_snippet_to_translate`, and the resulting `code_snippet_fro
 assembled with the row's `execution_engine` and run against its `expected_input_output_pairs`.
 
 Evaluation runs on the cluster in three phases — generation (GPU), sandboxed execution of untrusted
-model output (Apptainer, `--net none`), and reporting:
+model output (Apptainer, `--net --network none`), and reporting:
 
 ```bash
 cd "$REPO_DIR"

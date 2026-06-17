@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SLURM wrapper: install the evaluation extra and build evaluation.sif on a compute node.
+# SLURM wrapper: install the evaluation extra and build the evaluation sandbox image on a compute node.
 #
 # Must run on a compute node (not the login node) because:
 #   - uv sync with large extras is too CPU/IO-heavy for the login node
@@ -49,20 +49,24 @@ cd "$REPO_DIR"
 uv sync --extra rocm --extra evaluation --verbose
 
 # ---------------------------------------------------------------------------
-# Build the Apptainer image
+# Build the Apptainer image (--sandbox: a directory, not a .sif)
 # ---------------------------------------------------------------------------
+# --sandbox (a directory, not a .sif): packing a .sif needs mksquashfs, which can't run under
+# proot here (no /etc/subuid). apptainer exec runs the directory directly.
 IMAGES_DIR="$WORK_DIR/images"
+EVALUATION_IMAGE="$IMAGES_DIR/evaluation"
 mkdir -p "$IMAGES_DIR"
 
-echo "==> Building evaluation.sif (python:3.11-slim + g++ + openjdk-17; minutes, not hours) ..."
-apptainer build \
-    "$IMAGES_DIR/evaluation.sif" \
+echo "==> Building $EVALUATION_IMAGE (python:3.11-slim + g++ + openjdk-17, --sandbox) ..."
+apptainer build --sandbox \
+    "$EVALUATION_IMAGE" \
     "$REPO_DIR/src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def"
 
 echo ""
 echo "==> Evaluation setup complete!"
-echo "    SIF image: $IMAGES_DIR/evaluation.sif"
+echo "    Image (sandbox dir): $EVALUATION_IMAGE"
 echo ""
-echo "Verify the image has g++ and javac:"
-echo "    apptainer exec $IMAGES_DIR/evaluation.sif g++ --version"
-echo "    apptainer exec $IMAGES_DIR/evaluation.sif javac -version"
+echo "Verify the image (network-isolated exec works unprivileged here):"
+echo "    apptainer exec --net --network none $EVALUATION_IMAGE g++ --version"
+echo "    apptainer exec --net --network none $EVALUATION_IMAGE javac -version"
+echo "    apptainer exec --net --network none $EVALUATION_IMAGE python -c 'import llm_fine_tune.evaluation.run_execution_scoring'"
