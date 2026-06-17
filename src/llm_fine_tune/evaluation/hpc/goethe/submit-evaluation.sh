@@ -78,10 +78,15 @@ deactivate
 # Phase 2: execution + scoring (Apptainer, --net --network none, no bigcode)
 # ---------------------------------------------------------------------------
 # --net --network none: no outbound network for untrusted code. --cleanenv: keep host env out.
-# --bind: /work isn't auto-mounted.
+# Bind live src + PYTHONPATH ahead of the baked install, so Phase-2 code edits take effect
+# without rebuilding the sandbox. --bind /work paths (not auto-mounted).
 echo "==> Phase 2: executing + scoring translations in container ..."
 
-apptainer exec --net --network none --cleanenv --bind "$RESULTS_DIR" "$EVALUATION_IMAGE" \
+apptainer exec --net --network none --cleanenv \
+    --bind "$RESULTS_DIR" \
+    --bind "$REPO_DIR/src":/opt/live-src \
+    --env PYTHONPATH=/opt/live-src \
+    "$EVALUATION_IMAGE" \
     python -m llm_fine_tune.evaluation.run_execution_scoring \
         --generations-json "$GENERATIONS_FILE" \
         --evaluation-parquet "$EVALUATION_PARQUET" \
