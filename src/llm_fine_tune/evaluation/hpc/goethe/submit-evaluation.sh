@@ -3,8 +3,8 @@
 #
 # Three phases, split so the model never touches the execution sandbox and the untrusted
 # generated code never touches the network:
-#   Phase 1 — generation (GPU, ROCm venv): bigcode produces generations.json; we also dump
-#             the evaluation parquet here (network available) so Phase 2 can read it offline.
+#   Phase 1 — generation (GPU, ROCm venv): the model produces generations.json + the evaluation
+#             parquet (network available) so Phase 2 can read it offline.
 #   Phase 2 — execution  (Apptainer, --net --network none): the standalone scorer compiles + runs each
 #             code_snippet against its execution_engine and writes per-sample metrics.json.
 #             No bigcode, no model, no network.
@@ -36,7 +36,7 @@ MODEL="${1:?
   Usage: sbatch submit-evaluation.sh <path/to/merged-model> [extra bigcode flags...]
 }"
 shift
-GENERATION_FLAGS=("$@")  # passed through to run-bigcode-cli (e.g. --limit 20)
+GENERATION_FLAGS=("$@")  # passed through to generate-llm-responses (e.g. --limit 20)
 
 : "${WORK_DIR:?WORK_DIR is not set — export WORK_DIR=/work/<group>/<user> in ~/.bashrc}"
 : "${REPO_DIR:?REPO_DIR is not set — export REPO_DIR=\$WORK_DIR/llm-fine-tune in ~/.bashrc}"
@@ -64,22 +64,13 @@ echo ""
 echo "==> Phase 1: generating translations ..."
 source "$REPO_DIR/.venv/bin/activate"
 
-run-bigcode-cli \
+# Writes generations.json + evaluation.parquet into RESULTS_DIR from the same rows, in order.
+generate-llm-responses \
     --model "$MODEL" \
-    --tasks code_snippet_translation \
-    --generation_only \
-    --save_generations_path "$GENERATIONS_FILE" \
-    --max_length_generation 512 \
+    --output-dir "$RESULTS_DIR" \
+    --max-new-tokens 512 \
     --temperature 0.2 \
-    --n_samples 1 \
-    --batch_size 4 \
     "${GENERATION_FLAGS[@]}"
-
-echo "==> Phase 1: dumping evaluation parquet for offline scoring ..."
-python -c "
-from datasets import load_dataset
-load_dataset('tkeskin/leetcode-solutions', 'evaluation')['test'].to_parquet('$EVALUATION_PARQUET')
-"
 
 deactivate
 
