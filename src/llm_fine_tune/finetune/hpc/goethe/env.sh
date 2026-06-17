@@ -22,4 +22,9 @@ export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$(dirname "$REPO_DIR")/.cache/a
 export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$APPTAINER_CACHEDIR/tmp}"
 mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"
 
+# We're not in /etc/subuid, so apptainer builds/runs via proot. This node's seccomp
+# policy blocks proot's ptrace (mksquashfs "Operation not permitted"); disabling proot's
+# seccomp filter is the documented workaround. Harmless when proot isn't used.
+export PROOT_NO_SECCOMP=1
+
 export FINETUNE_EXTRA=rocm
