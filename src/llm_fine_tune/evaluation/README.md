@@ -158,6 +158,82 @@ The fine-tune's effect is not uniform across cells, and reading where it lands i
 
 ---
 
+## Standard benchmarks (base vs fine-tune)
+
+Alongside the custom translation eval, a **standard-benchmark track** answers three questions:
+
+| Question | Tool / metric | Untrusted exec? |
+|---|---|---|
+| **(a) Did training work?** | Held-out perplexity on `leetcode_instruct_test` | no |
+| **(b) Did code ability improve?** | bigcode HumanEval + MultiPL-E (`cpp`/`java`/`py`) pass@1 | yes (container) |
+| **(c) Did general ability regress?** | lm-eval `mmlu`, `gsm8k`, `hellaswag`, `arc_challenge`, `winogrande` | no |
+
+Run both models through `submit-benchmark.sh`; compare with `benchmark-report`.
+
+### Environments
+
+Three separate environments, none touching the training `.venv`. The two Python ones are
+**declarative uv sub-projects** (`pyproject.toml` + `uv sync`, torch routed to the ROCm index in each)
+so they're reproducible and can't constrain llamafactory; run them with `uv run --project <dir>`:
+
+| Environment | Purpose | Built by |
+|---|---|---|
+| `images/bigcode-multiple` | Apptainer sandbox — runs generated code (CPU, `--net none`) | `submit-benchmark-setup.sh` |
+| `eval-envs/bigcode-gen` | bigcode `main.py` generation (GPU, ROCm torch) | `submit-benchmark-setup.sh` |
+| `eval-envs/lmeval` | `lm-eval` general tasks (GPU, ROCm torch) | `submit-benchmark-setup.sh` |
+
+The bigcode CUDA image is used **only for execution** (Phase 4 — CPU, no model). Generation runs in
+the ROCm `eval-envs/bigcode-gen` env, which avoids the CUDA/ROCm conflict. (Perplexity (a) runs in the
+project `.venv`, which already has ROCm torch and our package.)
+
+### Running on the cluster (Goethe)
+
+```bash
+cd "$REPO_DIR"
+
+# One-time: build the bigcode sandbox + two generation venvs (~3–6h, general1 partition)
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark-setup.sh
+
+# Smoke-test the sandbox after setup
+apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" g++ --version
+apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" javac -version
+apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" python3 /app/main.py --help
+
+# Shakeout with --limit 10 on each task before the full run
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh \
+    Qwen/Qwen2.5-Coder-1.5B-Instruct --limit 10
+
+# Full core-curated run — base model, then fine-tune
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh Qwen/Qwen2.5-Coder-1.5B-Instruct
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh tkeskin/qwen2.5-coder-1.5b-code-translation
+
+# Compare — reads both result dirs and emits benchmark-summary.md + benchmark-results.parquet
+source "$REPO_DIR/.venv/bin/activate"
+benchmark-report \
+    --base-dir "$WORK_DIR/benchmark-results/<base-model>-<jobid>" \
+    --ft-dir   "$WORK_DIR/benchmark-results/<ft-model>-<jobid>" \
+    --out-dir  "$WORK_DIR/benchmark-results/comparison"
+```
+
+Each `submit-benchmark.sh` run writes into `$WORK_DIR/benchmark-results/<model>-<jobid>/`:
+
+| File | Written by |
+|---|---|
+| `perplexity.json` | Phase 1 (`compute-heldout-perplexity`) |
+| `lmeval/<model>/results_*.json` | Phase 2 (`lm_eval`, nested + timestamped) |
+| `generations_<task>.json` | Phase 3 (bigcode `--generation_only`) |
+| `bigcode_<task>.json` | Phase 4 (bigcode `--allow_code_execution` in-container) |
+
+### Reading the standard benchmark comparison
+
+`benchmark-report` produces a single `benchmark-summary.md` with base / fine-tune / Δ columns:
+
+- **(a) perplexity** — lower is better; a drop confirms the fine-tune learned from the training distribution. Sanity anchor: `Qwen2.5-Coder-1.5B-Instruct` baseline should be in the single-digit range on this domain-specific test split.
+- **(b) HumanEval / MultiPL-E pass@1** — code benchmarks; expect the fine-tune to hold flat-or-up on MultiPL-E (same languages as training). Sanity anchors for qwen2.5-coder-1.5b: HumanEval ≈ 40–55%.
+- **(c) mmlu / gsm8k / hellaswag / arc_challenge / winogrande** — general-capability probes; a large drop here signals catastrophic forgetting and is worth reporting separately.
+
+---
+
 ## Local checks (no cluster)
 
 The `execution_engine` and execution path can be validated locally without a model, via the

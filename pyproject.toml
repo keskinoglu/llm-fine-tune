@@ -29,6 +29,8 @@ run-execution-scoring = "llm_fine_tune.evaluation.run_execution_scoring:main"
 evaluation-report = "llm_fine_tune.evaluation.report:main"
 validate-expected-translations = "llm_fine_tune.dataset.quality.validate_expected_translations:main"
 audit-cross-source = "llm_fine_tune.dataset.quality.audit_cross_source:main"
+compute-heldout-perplexity = "llm_fine_tune.evaluation.compute_heldout_perplexity:main"
+benchmark-report = "llm_fine_tune.evaluation.benchmark_report:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true

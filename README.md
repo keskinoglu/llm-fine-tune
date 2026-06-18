@@ -282,6 +282,12 @@ The conclusion is the **delta** between the baseline and fine-tuned `pass@1` / `
 [`src/llm_fine_tune/evaluation/README.md`](src/llm_fine_tune/evaluation/README.md) for the full
 architecture, metrics, and how to read the comparison.
 
+A **standard-benchmark track** runs alongside the custom eval, comparing base vs fine-tune on
+recognized benchmarks: held-out perplexity (a), bigcode HumanEval + MultiPL-E pass@1 (b), and
+lm-eval general tasks — mmlu, gsm8k, hellaswag, arc_challenge, winogrande — to catch catastrophic
+forgetting (c). See the [Standard benchmarks section](src/llm_fine_tune/evaluation/README.md#standard-benchmarks-base-vs-fine-tune)
+for the three separate venvs, run commands, and how to read the `benchmark-summary.md` comparison.
+
 ---
 
 ## Available commands

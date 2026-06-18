@@ -1,0 +1,27 @@
+# Isolated, declarative env for EleutherAI lm-evaluation-harness (general benchmarks).
+# Synced on the cluster with: uv sync --project eval-envs/lmeval
+# Run with:                    uv run --project eval-envs/lmeval lm_eval ...
+# Kept out of the training .venv on purpose — its deps must not constrain llamafactory.
+[project]
+name = "lmeval-env"
+version = "0"
+description = "lm-evaluation-harness on ROCm (general LLM benchmarks: mmlu, gsm8k, ...)."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "lm-eval[hf]>=0.4.5",
+    # torch is listed directly so the [tool.uv.sources] ROCm index routing applies — uv does
+    # NOT route transitive deps, so an indirect torch would resolve a non-ROCm wheel.
+    "torch>=2.6",
+]
+
+[tool.uv]
+# This is an environment, not a package — don't try to build/install it.
+package = false
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-rocm" }]
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.2.4"
+explicit = true

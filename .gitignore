@@ -3,6 +3,9 @@ train-your-own-llm-course-material
 data/
 output/
 .env
+.venv
+.venv-*
+eval-envs/*/.venv/
 *.md
 !README.md
 !**/README.md
