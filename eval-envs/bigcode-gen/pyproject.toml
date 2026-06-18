@@ -10,15 +10,18 @@ description = "bigcode-evaluation-harness generation on ROCm (HumanEval, MultiPL
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "bigcode_eval @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git",
-    # Direct so the ROCm index routing below applies (bigcode pulls torch only transitively).
+    # torch listed direct so the ROCm index source (below) applies; its *version* is forced
+    # by override-dependencies (bigcode pins torch==2.0.1, which has no ROCm 6.2.4 wheel).
     "torch",
-    # bigcode's own transformers pin can predate Qwen2.5-Coder's architecture; force one new
-    # enough to load it. If bigcode hard-pins an incompatible `==`, relax it there instead.
-    "transformers>=4.45",
 ]
 
 [tool.uv]
 package = false
+# bigcode hard-pins torch==2.0.1 and a pre-Qwen2.5 transformers. A direct dep can't override a
+# transitive `==` pin, but override-dependencies can: force torch to a version the ROCm 6.2.4
+# index actually carries, and transformers to one that knows the Qwen2.5-Coder architecture.
+# If another bigcode pin (numpy, accelerate, datasets) conflicts after this, add it here too.
+override-dependencies = ["torch>=2.6", "transformers>=4.45"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-rocm" }]
