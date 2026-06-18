@@ -7,8 +7,8 @@ The project is organized as a pipeline of five stages:
 1. **Build the dataset** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish them as the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
 2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
 3. **Fine-tune** — Fine-tune the chosen base model on the `instruct` configuration using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on the Goethe-NHR cluster (AMD MI210 GPUs).
-4. **Publish the model** — Merge the LoRA adapter into the base weights and push the standalone fine-tuned model to [`tkeskin/llama-3.2-1b-instruct-code-translation`](https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation) on HuggingFace.
-5. **Evaluate** — Run the fine-tuned model on the held-out `evaluation` configuration, executing each translation against its `expected_input_output_pairs` in a sandbox to measure whether it compiles and passes.
+4. **Publish the model** — Merge the LoRA adapter into the base weights and push the standalone fine-tuned model to your HuggingFace namespace (`tkeskin/<model>-code-translation`).
+5. **Evaluate** — Pull the base model and the published fine-tune from HuggingFace and run both on the held-out `evaluation` configuration, executing each translation against its `expected_input_output_pairs` in a sandbox. The result is the **delta** between the two.
 
 The dataset has two configurations:
 
@@ -202,7 +202,7 @@ uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility -s my-token
 
 Fine-tunes the base model chosen in Stage 2 on the `instruct` dataset using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on an HPC cluster.
 
-The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)** with **LoRA** using `flash_attn: sdpa` — runs on AMD ROCm and NVIDIA CUDA without any FlashAttention library. Multi-GPU training via `torchrun` is automatic.
+Each config fine-tunes one base model with **LoRA** using `flash_attn: sdpa` — runs on AMD ROCm and NVIDIA CUDA without any FlashAttention library. Multi-GPU training via `torchrun` is automatic. Configs ship under [`src/llm_fine_tune/finetune/configs/`](src/llm_fine_tune/finetune/configs/) (one `<model>-lora.yaml` + `<model>-merge.yaml` pair per model — `llama-3.2-1b`, `qwen2.5-coder-1.5b`, `gemma-3-4b-it`, `mistral-7b-v0.3`, …); pass the one you want as the only argument to `submit.sh`.
 
 The training configs are hardware-agnostic. Cluster-specific scripts live under `hpc/`:
 - **AMD / ROCm / SLURM (Goethe):** [`hpc/goethe/`](src/llm_fine_tune/finetune/hpc/goethe/)
@@ -219,29 +219,30 @@ make finetune-sync   # requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env
 ## Stage 4: Publish the fine-tuned model
 
 LoRA training saves only the adapter deltas — not a standalone model. The publish stage merges those
-deltas into the base weights and pushes the result to HuggingFace as
-[`tkeskin/llama-3.2-1b-instruct-code-translation`](https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation).
+deltas into the base weights and pushes the result to HuggingFace under your namespace
+(`tkeskin/<model>-code-translation`). Evaluation (Stage 5) pulls it back from there.
 
 The merge runs on the cluster (where the adapter, base model cache, and venv live). The publish step
 uses the `publish-model` entry point, which handles repo creation, model card injection, upload, and
 optional version tagging.
 
-**Merge + publish in one SLURM job (Goethe):**
+**Merge + publish in one SLURM job (Goethe)** — use the `<model>-merge.yaml` matching the config you
+trained with (the Qwen-Coder run is shown):
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
-    "$WORK_DIR/saves/<run-name>" \
-    tkeskin/llama-3.2-1b-instruct-code-translation
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-merge.yaml \
+    "$WORK_DIR/saves/qwen2.5-coder-1.5b-lora" \
+    tkeskin/qwen2.5-coder-1.5b-code-translation
 ```
 
 **Re-publish an already-merged model** (e.g. after a full training run, or to add a version tag):
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
 publish-model \
-    --model-dir "$WORK_DIR/exports/<run-name>" \
-    --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
-    --card llama-3.2-1b \
+    --model-dir "$WORK_DIR/exports/qwen2.5-coder-1.5b-lora" \
+    --repo-id tkeskin/qwen2.5-coder-1.5b-code-translation \
+    --card qwen2.5-coder-1.5b \
     --message "Fully trained v1 (3 epochs)" \
     --tag v1
 ```
@@ -260,8 +261,10 @@ just plausible-looking code. The model translates each `code_snippet_to_translat
 `code_snippet_from_llm_response` is assembled with the row's `execution_engine` and run against its
 `expected_input_output_pairs` in a network-isolated sandbox.
 
-Evaluation runs on the cluster in three phases — generation (GPU), sandboxed execution of untrusted
-model output (Apptainer, `--net --network none`), and reporting:
+The workflow evaluates **two models pulled from HuggingFace** and compares them: the upstream **base**
+model (the baseline) and the **fine-tune** published in Stage 4. Each runs on the cluster in three
+phases — generation (GPU), sandboxed execution of untrusted model output (Apptainer,
+`--net --network none`), and reporting — and `submit-evaluation.sh` takes an HF repo id directly:
 
 ```bash
 cd "$REPO_DIR"
@@ -270,14 +273,14 @@ make upload DATASET=evaluation   # publish the evaluation config first (run loca
 # One-time: build the execution sandbox image
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation-setup.sh
 
-# Baseline, then the fine-tuned model; diff the two summary.md outputs
+# Baseline (upstream base model), then the published fine-tune; diff the two summary.md outputs
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh Qwen/Qwen2.5-Coder-1.5B-Instruct
-sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh "$WORK_DIR/saves/<merged-dir>"
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh tkeskin/qwen2.5-coder-1.5b-code-translation
 ```
 
 The conclusion is the **delta** between the baseline and fine-tuned `pass@1` / `compiled` rates. See
 [`src/llm_fine_tune/evaluation/README.md`](src/llm_fine_tune/evaluation/README.md) for the full
-architecture, metrics, and first-run checklist.
+architecture, metrics, and how to read the comparison.
 
 ---
 

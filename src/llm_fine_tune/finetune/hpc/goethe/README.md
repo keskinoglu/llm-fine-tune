@@ -63,9 +63,9 @@ tail -f setup_<JOBID>.out
 Look for `==> Setup complete!` at the end.
 
 **4. Log in to HuggingFace** — the setup job installs everything but does not log you in. Run these
-yourself after it finishes. You must also accept the model license on
-[huggingface.co/meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)
-in your browser before the token will work:
+yourself after it finishes. If your base model is **gated** (e.g.
+[Llama](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)) you must also accept its license in
+your browser before the token will work; Apache-2.0 models like Qwen-Coder need no acceptance:
 
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
@@ -83,7 +83,7 @@ full pipeline before committing to 8 hours:
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-test.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-lora.yaml
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-lora.yaml
 ```
 
 Monitor:
@@ -104,10 +104,10 @@ Success markers (in order):
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-lora.yaml
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-lora.yaml
 ```
 
-Checkpoints are saved under `$WORK_DIR/saves/llama-3.2-1b-lora/`.
+Checkpoints are saved under `$WORK_DIR/saves/qwen2.5-coder-1.5b-lora/`.
 
 ---
 
@@ -117,7 +117,7 @@ After training, the saved directory contains only the LoRA adapter deltas. The m
 those deltas into the base model weights to produce a self-contained model you can push to HuggingFace.
 
 **Prerequisite: HF write token.** The token cached via `hf auth login` may only have read access
-(sufficient for downloading the gated Llama model). Pushing a model requires write access to
+(sufficient for downloading the base model). Pushing a model requires write access to
 `tkeskin/` repos. If the push returns 401/403, re-run `hf auth login` with a write-scoped token.
 
 Three separate commands — use the one that fits:
@@ -126,17 +126,17 @@ Three separate commands — use the one that fits:
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
-    "$WORK_DIR/saves/test-llama-3.2-1b-lora"
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-merge.yaml \
+    "$WORK_DIR/saves/test-qwen2.5-coder-1.5b-lora"
 ```
 
 **2. Publish only** — uploads an already-merged directory to HuggingFace (run from login node after activating the venv):
 ```bash
 source "$REPO_DIR/.venv/bin/activate"
 publish-model \
-    --model-dir "$WORK_DIR/exports/test-llama-3.2-1b-lora" \
-    --repo-id tkeskin/llama-3.2-1b-instruct-code-translation \
-    --card llama-3.2-1b \
+    --model-dir "$WORK_DIR/exports/test-qwen2.5-coder-1.5b-lora" \
+    --repo-id tkeskin/qwen2.5-coder-1.5b-code-translation \
+    --card qwen2.5-coder-1.5b \
     --tag v0.1 \
     --message "10-step smoke test"
 ```
@@ -145,12 +145,12 @@ publish-model \
 ```bash
 cd "$REPO_DIR"
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge-and-publish.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
-    "$WORK_DIR/saves/test-llama-3.2-1b-lora" \
-    tkeskin/llama-3.2-1b-instruct-code-translation \
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-merge.yaml \
+    "$WORK_DIR/saves/test-qwen2.5-coder-1.5b-lora" \
+    tkeskin/qwen2.5-coder-1.5b-code-translation \
     v0.1 \
     "10-step smoke test" \
-    llama-3.2-1b
+    qwen2.5-coder-1.5b
 ```
 
 Monitor any of these jobs with:
@@ -159,7 +159,7 @@ tail -f merge_*.out        # submit-merge.sh
 tail -f merge_publish_*.out  # submit-merge-and-publish.sh
 ```
 
-On success the log ends with `Done! https://huggingface.co/tkeskin/llama-3.2-1b-instruct-code-translation`.
+On success the log ends with `Done! https://huggingface.co/tkeskin/qwen2.5-coder-1.5b-code-translation`.
 
 ---
 

@@ -83,25 +83,38 @@ model and its fine-tuned counterpart, which is why `compiled` is tracked separat
 
 ## Running on the cluster (Goethe)
 
-Prerequisites: the full repo at `$REPO_DIR`, `WORK_DIR`/`REPO_DIR` exported in `~/.bashrc`, and the
-**evaluation** config published to HuggingFace (`make upload DATASET=evaluation`) — the task loads
-`tkeskin/leetcode-solutions / evaluation` from the Hub at job start.
+The conclusion is a **comparison of two models pulled from the Hub**: the upstream base model and
+your published fine-tune. Both are passed to `submit-evaluation.sh` as HuggingFace repo ids — Phase 1
+hands the id straight to `from_pretrained`, so the weights download from the Hub at job start. (A
+local path also works, but the documented workflow uses published repos so a run is reproducible from
+ids alone — the same base/fine-tune pair anyone else can pull.)
+
+Prerequisites:
+
+- The full repo at `$REPO_DIR`, with `WORK_DIR`/`REPO_DIR` exported in `~/.bashrc`.
+- The **evaluation** config published to HuggingFace (`make upload DATASET=evaluation`) — Phase 2
+  loads `tkeskin/leetcode-solutions / evaluation` from the Hub.
+- A **published fine-tuned model** to evaluate — the output of Stages 3–4 (fine-tune → merge →
+  `publish-model`); see [`../finetune/README.md`](../finetune/README.md). The **base** model is
+  whatever that fine-tune started from (e.g. `Qwen/Qwen2.5-Coder-1.5B-Instruct`); evaluating it gives
+  the baseline the fine-tune is measured against.
 
 ```bash
 cd "$REPO_DIR"
 
-# One-time: install the evaluation extra + build the --sandbox image (compute node — needs network)
+# One-time: build the --sandbox execution image (compute node — needs network)
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation-setup.sh
 
-# Baseline: evaluate the un-fine-tuned model (pass an HF id directly)
+# Baseline — the upstream base model the fine-tune started from
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh Qwen/Qwen2.5-Coder-1.5B-Instruct
 
-# Tuned: evaluate the merged fine-tune; diff its summary.md against the baseline
-sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh "$WORK_DIR/saves/<merged-dir>"
+# Fine-tuned — your published model
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh tkeskin/qwen2.5-coder-1.5b-code-translation
 ```
 
-Results land in `$WORK_DIR/evaluation-results/<model>-<jobid>/` as `evaluation-results.parquet` and
-`summary.md`. The baseline-vs-tuned comparison of those summaries is the project's conclusion.
+Each run writes to `$WORK_DIR/evaluation-results/<model>-<jobid>/`: `generations.json`,
+`metrics.json`, `evaluation-results.parquet`, and `summary.md`. Diff the two `summary.md` files — that
+delta is the result (see [Reading the results](#reading-the-results)).
 
 After building the image, sanity-check it before spending a GPU job:
 
@@ -129,6 +142,19 @@ execution path is independently validated (`validate-expected-translations` reac
 - **`diagnostics`** holds the truncated compiler/runtime stderr for any failed row.
 - **Alignment is structural:** `generate_llm_responses` writes `generations.json` and
   `evaluation.parquet` from the same rows in order, so `generations[i]` ↔ parquet row `i`.
+
+### Comparing baseline vs fine-tuned
+
+Diff the two `summary.md` tables cell-by-cell (`source_language` × `target_language` × `difficulty`).
+The fine-tune's effect is not uniform across cells, and reading where it lands is the point:
+
+- **`→cpp` / `→java` cells are gated by `compile%`.** The base model often loses points to code that
+  doesn't build, not to wrong logic — when `compile%` and `pass@1` are both low but close, the
+  bottleneck is syntax/idiom, exactly what fine-tuning on target-language references should lift.
+- **`→python` cells compile ~100%** (interpreted), so they move on **correctness** (`avg_pass%` /
+  `pass@1`), not `compile%`.
+- **Watch the `redefinition` count** (from the `outcome` column in the parquet, not `summary.md`): a
+  format failure the fine-tune should shrink. Track it separately from genuine `compile_error`s.
 
 ---
 

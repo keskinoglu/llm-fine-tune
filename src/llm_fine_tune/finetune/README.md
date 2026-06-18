@@ -2,7 +2,7 @@
 
 This directory contains everything needed to fine-tune a model using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on an HPC cluster.
 
-The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)** with **LoRA** on the `leetcode_instruct_train` dataset, holding out `leetcode_instruct_test` for evaluation.
+Each config fine-tunes one base model with **LoRA** on the `leetcode_instruct_train` dataset, holding out `leetcode_instruct_test` for evaluation. The configs under `configs/` ship as `<model>-lora.yaml` + `<model>-merge.yaml` pairs; the examples below use the Qwen-Coder run.
 
 ---
 
@@ -11,7 +11,8 @@ The default config fine-tunes **[meta-llama/Llama-3.2-1B-Instruct](https://huggi
 ```
 finetune/
   configs/
-    llama-3.2-1b-lora.yaml    — primary config (AMD + NVIDIA, runs anywhere)
+    <model>-lora.yaml         — one LoRA config per model (AMD + NVIDIA, runs anywhere)
+    <model>-merge.yaml        — matching export config for the merge step
     gpt-oss-20b-lora.yaml     — advanced / NVIDIA Hopper-only (see warning in file)
   hpc/
     common.sh                 — shared launch_training() + env validation (sourced by all clusters)
@@ -35,20 +36,21 @@ finetune/
 
 ## Configs
 
-### `llama-3.2-1b-lora.yaml` (default)
+### `<model>-lora.yaml` (the LoRA configs)
 
 - `flash_attn: sdpa` — uses PyTorch's built-in SDPA. No `flash-attn` library needed. Works on
   AMD ROCm and NVIDIA CUDA alike.
 - `bf16: true` — supported on AMD MI210 and NVIDIA Ampere+ (A100, H100, A6000). For older
   NVIDIA GPUs (V100, sm_70): set `bf16: false` and `fp16: true`.
-- Requires accepting the [Meta Llama license](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)
-  once on HuggingFace before your token will work.
+- **Gated** base models (e.g. [Llama](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct))
+  require accepting their license once on HuggingFace before your token will work. Apache-2.0 models
+  like Qwen-Coder need no such acceptance.
 
 ### `gpt-oss-20b-lora.yaml` (advanced / NVIDIA Hopper-only)
 
 LLaMA-Factory hardcodes FlashAttention-3 for `gpt_oss` and ignores the `flash_attn` config key.
 FA3 requires NVIDIA Hopper (H100/H200) — it will not run on AMD or pre-Hopper NVIDIA. This config
-is kept for reference; use `llama-3.2-1b-lora.yaml` for anything that needs to run on AMD.
+is kept for reference; use any `<model>-lora.yaml` for anything that needs to run on AMD.
 
 ---
 
@@ -66,12 +68,12 @@ actually use (and push to HuggingFace), merge the adapter into the base weights:
 
 ```bash
 sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
-    src/llm_fine_tune/finetune/configs/llama-3.2-1b-merge.yaml \
-    "$WORK_DIR/saves/<run-name>" \
-    tkeskin/llama-3.2-1b-instruct-code-translation
+    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-merge.yaml \
+    "$WORK_DIR/saves/qwen2.5-coder-1.5b-lora" \
+    tkeskin/qwen2.5-coder-1.5b-code-translation
 ```
 
-`configs/llama-3.2-1b-merge.yaml` is the portable export config. The cluster job script injects
+The `<model>-merge.yaml` is the portable export config. The cluster job script injects
 `adapter_name_or_path` and `export_dir` at runtime. If you omit the repo id argument, the script
 merges only and prints the `publish-model` command to run manually.
 
@@ -85,9 +87,9 @@ Drop a YAML in `configs/` and pass its path to the cluster's submit script. Comm
 
 | File | Notes |
 |---|---|
-| `llama-3.2-1b-qlora.yaml` | Add `quantization_bit: 4`. Caution: bitsandbytes on ROCm is brittle. |
-| `llama-3.2-1b-full.yaml` | Remove `finetuning_type: lora`. Full SFT needs DeepSpeed ZeRO-3. |
-| `qwen3-0.6b-lora.yaml` | Smaller/faster; use `template: qwen3`. |
+| `<model>-qlora.yaml` | Add `quantization_bit: 4`. Caution: bitsandbytes on ROCm is brittle. |
+| `<model>-full.yaml` | Remove `finetuning_type: lora`. Full SFT needs DeepSpeed ZeRO-3. |
+| `<model>-lora.yaml` | Set the right chat `template:` for the model family (e.g. `qwen`, `qwen3`). |
 
 ---
 
