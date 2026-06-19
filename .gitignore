@@ -9,3 +9,4 @@ eval-envs/*/.venv/
 *.md
 !README.md
 !**/README.md
+!RESULTS.md

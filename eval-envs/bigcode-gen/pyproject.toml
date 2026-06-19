@@ -10,9 +10,11 @@ description = "bigcode-evaluation-harness generation on ROCm (HumanEval, MultiPL
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "bigcode_eval @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git",
-    # torch listed direct so the ROCm index source (below) applies; its *version* is forced
-    # by override-dependencies (bigcode pins torch==2.0.1, which has no ROCm 6.2.4 wheel).
+    # torch + its ROCm triton sidecar listed direct so the ROCm index source (below) applies —
+    # uv does NOT route transitive deps and the index is explicit, so an unlisted triton (which
+    # torch==*+rocm requires) can't be found. torch's version is forced by override-dependencies.
     "torch",
+    "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [tool.uv]
@@ -25,6 +27,7 @@ override-dependencies = ["torch>=2.6", "transformers>=4.45"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-rocm" }]
+pytorch-triton-rocm = [{ index = "pytorch-rocm" }]
 
 [[tool.uv.index]]
 name = "pytorch-rocm"

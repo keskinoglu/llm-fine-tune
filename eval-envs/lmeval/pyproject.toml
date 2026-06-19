@@ -9,9 +9,11 @@ description = "lm-evaluation-harness on ROCm (general LLM benchmarks: mmlu, gsm8
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "lm-eval[hf]>=0.4.5",
-    # torch is listed directly so the [tool.uv.sources] ROCm index routing applies — uv does
-    # NOT route transitive deps, so an indirect torch would resolve a non-ROCm wheel.
+    # torch + its ROCm triton sidecar listed directly so the [tool.uv.sources] routing applies —
+    # uv does NOT route transitive deps and the index is explicit, so an unlisted triton (a torch
+    # dependency) can't be resolved.
     "torch>=2.6",
+    "pytorch-triton-rocm>=3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [tool.uv]
@@ -20,6 +22,7 @@ package = false
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-rocm" }]
+pytorch-triton-rocm = [{ index = "pytorch-rocm" }]
 
 [[tool.uv.index]]
 name = "pytorch-rocm"
