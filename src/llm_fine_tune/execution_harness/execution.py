@@ -199,7 +199,11 @@ def _compile(cmd: list[str]) -> ExecutionResult:
 def _run_subprocess(cmd: list[str], timeout_s: float) -> ExecutionResult:
     start = time.perf_counter()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
+        # errors="replace": untrusted model code can emit non-UTF-8 bytes on stdout/stderr;
+        # decode lossily so one such row scores as wrong_output instead of crashing the run.
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, errors="replace", timeout=timeout_s
+        )
     except subprocess.TimeoutExpired:
         return _failed("Execution timed out")
     runtime_ms = (time.perf_counter() - start) * 1000

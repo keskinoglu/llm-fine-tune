@@ -18,7 +18,30 @@ Both run with `--max-new-tokens 512`, `--temperature 0.2` (same budget = fair co
 trained with LoRA on `leetcode_instruct_train`; the eval set is built from the held-out
 `leetcode_instruct_test` split, so there is no train/test leakage.
 
-## Headline (n-weighted over all 3,336 payloads)
+## Cross-model summary (all fine-tunes)
+
+Same eval, every published base→fine-tune pair. Overall pass@1, n-weighted across all 3,336 payloads:
+
+| base → fine-tune | base | ft | Δ |
+|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 29.3% | 61.9% | **+32.6** |
+| Llama-3.2-1B-Instruct | 17.5% | 32.5% | +15.0 |
+| Qwen3.5-0.8B | 16.2% | 15.7% | **−0.5** |
+| gemma-3-4b-it | — | — | pending (Phase-2 crash fixed; re-run) |
+| Mistral-7B-Instruct-v0.3 | — | — | pending (run status unknown) |
+
+The effect is **strongly model-dependent** — that's the cross-model headline:
+- **Qwen2.5-Coder-1.5B** (code-pretrained) gains the most; it already "speaks" the target languages, so
+  SFT on translations sharpens format + correctness hard.
+- **Llama-3.2-1B** (general 1B) gains solidly (+15) from a lower base.
+- **Qwen3.5-0.8B** shows **no transfer** — flat, fractionally worse. The smallest model (and an unusual
+  linear-attention arch) didn't convert the SFT into translation skill. An honest negative result.
+
+Three points isn't enough to claim a mechanism; gemma (4B) and mistral (7B) would fill in the capacity
+axis. The detailed tables below are the **qwen2.5-coder-1.5b deep dive** (the lead result); per-model
+detail belongs in each model's HuggingFace card.
+
+## Headline — qwen2.5-coder-1.5b (n-weighted over all 3,336 payloads)
 
 | Metric | Base | Fine-tune | Δ |
 |---|---|---|---|
@@ -105,8 +128,8 @@ Every one of the 18 (source × target × difficulty) cells improved — no regre
 ## Open (not yet measured — do NOT claim)
 
 - [x] **`redefinition` outcome share** base vs ft — measured: 198 (5.9%) → 0. See outcome breakdown.
-- [ ] **Other 4 models** (llama-3.2-1b, qwen-3.5-0.8b, gemma-3-4b-it, mistral-7b-v0.3) base vs ft —
-      8 eval jobs queued; extend the matrix when they land.
+- [~] **Other 4 models** — llama-3.2-1b ✓ and qwen3.5-0.8b ✓ (see cross-model summary); gemma-3-4b-it
+      (Phase-2 crash, now fixed — re-run) and mistral-7b-v0.3 (status unknown) still pending.
 - [ ] **(a) Did training work, traditionally?** Held-out perplexity base vs ft. Not run.
 - [ ] **(c) General-ability regression?** lm-eval (mmlu/gsm8k/...). Benchmark track not set up/run.
 - [ ] **(b) Standard code benchmarks** (HumanEval, MultiPL-E) for an external comparison point. Not run.
