@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: help lint lf commit cz bump base instruct evaluation datasets clean-data upload publish fertility finetune-sync test docker-build verify-engines-docker
+.PHONY: help lint lf commit cz bump base instruct evaluation datasets clean-data upload publish publish-cards fertility finetune-sync test docker-build verify-engines-docker
 
 help:
 	@echo "Available commands:"
@@ -18,6 +18,7 @@ help:
 	@echo "  make upload          Upload to HuggingFace (default: all). DATASET=base|instruct|evaluation to upload one"
 	@echo "  make publish         Build all datasets then upload all"
 	@echo "  make publish DATASET=base|instruct|evaluation  Build and upload one dataset"
+	@echo "  make publish-cards   Update model card README.md on each HF model repo (CARD=\"name1 name2\" for a subset)"
 	@echo "  make test            Run unit tests"
 	@echo "  make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt"
 	@echo "  make finetune-sync   Rsync the finetune/ configs and scripts to the cluster (requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env)"
@@ -61,6 +62,9 @@ upload:
 publish:
 	$(MAKE) $(if $(DATASET),$(DATASET),datasets)
 	$(MAKE) upload $(if $(DATASET),DATASET=$(DATASET))
+
+publish-cards:
+	uv run python -m llm_fine_tune.publish.update_model_cards $(if $(CARD),--cards $(CARD))
 
 test:
 	uv run pytest
