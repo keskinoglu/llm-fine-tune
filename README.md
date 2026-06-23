@@ -308,3 +308,7 @@ make fertility       Compute tokenizer fertility for sources in tokenizer-source
 make finetune-sync   Rsync finetune/ configs and scripts to the cluster
 publish-model        Merge + push: upload a merged model directory to HuggingFace
 ```
+
+---
+
+> AI-DISCLAIMER: This codebase was AI-generated with minimal human review. Deploy with caution.
