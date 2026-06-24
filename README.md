@@ -2,215 +2,86 @@
 
 Fine-tune an open LLM to translate code between **C++**, **Java**, and **Python**.
 
-The project is organized as a pipeline of five stages:
+The project is a pipeline of five stages. Each stage's detail lives with the thing it describes —
+this README is the map and links out to the ground truth.
 
-1. **Build the dataset** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish them as the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
-2. **Pick a base model** — Compare tokenizer fertility across candidate HuggingFace models to choose the one that encodes code most efficiently.
-3. **Fine-tune** — Fine-tune the chosen base model on the `instruct` configuration using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on the Goethe-NHR cluster (AMD MI210 GPUs).
-4. **Publish the model** — Merge the LoRA adapter into the base weights and push the standalone fine-tuned model to your HuggingFace namespace (`tkeskin/<model>-code-translation`).
-5. **Evaluate** — Pull the base model and the published fine-tune from HuggingFace and run both on the held-out `evaluation` configuration, executing each translation against its `expected_input_output_pairs` in a sandbox. The result is the **delta** between the two.
+1. **[Build the dataset](#stage-1-build-the-dataset)** — Parse [`walkccc/LeetCode`](https://github.com/walkccc/LeetCode) into structured translation pairs and publish the [`tkeskin/leetcode-solutions`](https://huggingface.co/datasets/tkeskin/leetcode-solutions) HuggingFace dataset.
+2. **[Pick a base model](#stage-2-pick-a-base-model)** — Compare tokenizer fertility across candidate models to choose the one that encodes code most efficiently.
+3. **[Fine-tune](#stage-3-fine-tune)** — LoRA fine-tune the chosen base on the `instruct` config using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), on the Goethe-NHR cluster (AMD MI210).
+4. **[Publish the model](#stage-4-publish-the-fine-tuned-model)** — Merge the LoRA adapter into the base weights and push the standalone model to HuggingFace (`tkeskin/<model>-code-translation`).
+5. **[Evaluate](#stage-5-evaluate)** — Pull the base and the fine-tune from HuggingFace and run both, executing each translation against real test cases in a sandbox. The result is the **delta** between the two.
 
-The dataset has two configurations:
+## Dataset
+
+The dataset has two configurations — `base` (one row per LeetCode problem with per-language solution
+columns) and `instruct` (directed translation triples, split 70/30 at problem granularity to prevent
+leakage):
 
 ```python
 from datasets import load_dataset
 
-# One row per LeetCode problem with per-language solution columns
 ds = load_dataset("tkeskin/leetcode-solutions", "base")
-
-# Instruction-tuning triples for directed code translation
 ds = load_dataset("tkeskin/leetcode-solutions", "instruct")
 ```
 
-## Dataset schema
-
-### `base`
-
-Each row is one LeetCode problem. Language columns contain the solution source code and are `null` when no solution exists for that language. Metadata columns are `null` for problems not present in the secondary source.
-
-| Column                | Type   | Description                                           |
-|-----------------------|--------|-------------------------------------------------------|
-| `problem_id`          | int64  | LeetCode problem number                               |
-| `title`               | string | Problem title                                         |
-| `cpp`                 | string | C++ solution (~3,495 problems)                        |
-| `java`                | string | Java solution (~3,371 problems)                       |
-| `python`              | string | Python solution (~3,169 problems)                     |
-| `sql`                 | string | SQL solution (~307 problems)                          |
-| `typescript`          | string | TypeScript solution (~69 problems)                    |
-| `difficulty`          | string | `Easy`, `Medium`, or `Hard`                           |
-| `input_output`        | list   | `[{"input": ..., "output": ...}]` test case pairs     |
-| `problem_description` | string | Full problem statement                                |
-| `entry_point`         | string | Function/method name to implement                     |
-| `prompt`              | string | Prompt template variant                               |
-| `query`               | string | Full problem prompt with context                      |
-| `response`            | string | Reference explanation/response                        |
-| `tags`                | list   | Topic tags (e.g. `["Array", "Hash Table"]`)           |
-| `estimated_date`      | date   | Problem publication date                              |
-| `task_id`             | string | URL slug identifier (e.g. `two-sum`)                  |
-
-### `instruct`
-
-Derived from `base`. Each row is a directed code-translation pair between C++, Java, and Python (Python→Java and Java→Python are separate rows). Split 70/30 at problem granularity — all translation pairs for a given problem land on the same side, preventing train/test leakage.
-
-| Column        | Type   | Description                                    |
-|---------------|--------|------------------------------------------------|
-| `instruction` | string | Natural-language instruction (randomly varied) |
-| `input`       | string | Source code to translate from                  |
-| `output`      | string | Target code to translate to                    |
-
-The dataset card (displayed on HuggingFace) lives in [`dataset_card/README.md`](dataset_card/README.md).
+Full schema, column types, and per-language coverage live on the
+[dataset card](https://huggingface.co/datasets/tkeskin/leetcode-solutions) (source in
+[`dataset_card/README.md`](dataset_card/README.md)).
 
 ## Setup
 
-Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11–3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 ```
 
+Run `make help` for the full list of commands.
+
 ## Stage 1: Build the dataset
 
-Pass `--pull` to fetch the latest changes before building:
-
 ```bash
-uv run python -m llm_fine_tune.dataset.build_base_dataset --pull
+make dataset    # build base + instruct Parquet (clones walkccc/LeetCode on first run)
+make publish    # build, then upload Parquet + dataset card to HuggingFace
 ```
 
-Build the `base` dataset (clones `walkccc/LeetCode` on first run):
-
-```bash
-make base
-```
-
-Build the `instruct` dataset from the `base` parquet:
-
-```bash
-make instruct
-```
-
-Build both in one shot:
-
-```bash
-make dataset
-```
-
-To start fresh:
-
-```bash
-make clean-data
-make dataset
-```
-
-### Publishing to HuggingFace
-
-Authentication is required. Set your HF token once:
-
-```bash
-export HF_TOKEN="hf_..."
-```
-
-Or store it permanently via:
-
-```bash
-uv run huggingface-cli login
-```
-
-Then upload both Parquet files and the dataset card in a single atomic commit:
-
-```bash
-make upload
-```
-
-Or build and upload in one shot:
-
-```bash
-make publish
-```
-
-To customise the commit message:
-
-```bash
-uv run python -m llm_fine_tune.dataset.upload_dataset --message "Add instruct config"
-```
-
-Uploads use HuggingFace's [Xet storage backend](https://huggingface.co/docs/hub/xet/using-xet-storage) automatically via `huggingface-hub>=0.32.0`.
+Publishing needs a HuggingFace token (`export HF_TOKEN=hf_...` or `uv run huggingface-cli login`) and
+uses the [Xet storage backend](https://huggingface.co/docs/hub/xet/using-xet-storage) automatically.
+See `make help` for per-dataset and custom-message variants.
 
 ## Stage 2: Pick a base model
 
-Before fine-tuning, compare how efficiently candidate HuggingFace models tokenize the dataset. A tokenizer that produces fewer tokens per unit of code means lower fine-tuning and inference cost on the same training budget.
-
-Tokenizer fertility measures how efficiently a tokenizer encodes text. Lower `tokens_per_word` and higher `bytes_per_token` mean better compression — especially important for code-heavy datasets.
-
-Run the evaluation against the full instruct dataset — `output/leetcode-instruct-train.parquet` and `output/leetcode-instruct-test.parquet` concatenated (build them first with `make instruct`):
+Before fine-tuning, compare how efficiently candidate models tokenize the dataset — fewer tokens per
+unit of code means lower training and inference cost on the same budget. Only the tokenizer is loaded
+from each model; weights are never downloaded.
 
 ```bash
-make fertility
+make fertility   # evaluate the tokenizers listed in tokenizer-sources.txt
 ```
 
-The script loads only the tokenizer from each model — weights are never downloaded. Results are printed to stdout and saved to `output/tokenizer-fertility-report.parquet`.
+Configure which models to compare by editing [`tokenizer-sources.txt`](tokenizer-sources.txt)
+(`<display-name>=<huggingface-model-id>` per line). Results print to stdout and save to
+`output/tokenizer-fertility-report.parquet`.
 
-Three metrics are reported per tokenizer:
-
-| Metric | What it measures | Better when |
-|---|---|---|
-| `tokens_per_word` | Tokens per word in the code | Lower |
-| `chars_per_token` | Characters compressed per token | Higher |
-| `bytes_per_token` | UTF-8 bytes per token (compression ratio) | Higher |
-
-Typical ranges for code: `tokens_per_word` ~1.5–5, `bytes_per_token` ~2.5–4.
-
-**How "word" is defined:** words are extracted with the regex `\w+` (`[a-zA-Z0-9_]`), which splits on punctuation, operators, and whitespace. This is language-agnostic — it works identically for Python, Java, C++, SQL, etc. The key coding implication is that `_` is included, so `snake_case` identifiers count as **one** word, which matches how developers read them. `camelCase` also counts as one word (no sub-word splitting). Numbers count as words too.
+Three metrics are reported per tokenizer — `tokens_per_word` (lower is better), `chars_per_token` and
+`bytes_per_token` (higher is better). "Word" is defined by the regex `\w+`, so `snake_case` and
+`camelCase` identifiers each count as one word, language-agnostically:
 
 ```
-for(int i = 0; i < n; i++)   →  for  int  i  0  i  n  i   (7 words)
-def calculate_total(items):   →  def  calculate_total  items  (3 words)
-```
-
-### Configuring which tokenizers to evaluate
-
-Edit `tokenizer-sources.txt` at the project root. Each line maps a display name to a HuggingFace model ID:
-
-```
-# Each line: <display-name>=<huggingface-model-id>
-# Only the tokenizer is loaded — model weights are never downloaded.
-# Lines starting with '#' and blank lines are ignored.
-qwen2.5-coder-7b=Qwen/Qwen2.5-Coder-7B-Instruct
-codestral-22b=mistralai/Codestral-22B-v0.1
-```
-
-To evaluate against a remote HuggingFace dataset instead of the local parquet:
-
-```bash
-uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility \
-  --hf-dataset tkeskin/leetcode-solutions \
-  --hf-config instruct
-```
-
-For a quick smoke test on a subset:
-
-```bash
-uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility --limit 100
-```
-
-Use a custom tokenizer sources file:
-
-```bash
-uv run python -m llm_fine_tune.tokenizer.analyze_tokenizer_fertility -s my-tokenizers.txt
+for(int i = 0; i < n; i++)   →  for  int  i  0  i  n  i      (7 words)
+def calculate_total(items):  →  def  calculate_total  items  (3 words)
 ```
 
 ## Stage 3: Fine-tune
 
-Fine-tunes the base model chosen in Stage 2 on the `instruct` dataset using [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) on an HPC cluster.
+LoRA fine-tune the base model chosen in Stage 2 on the `instruct` dataset using
+[LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory). Training configs are hardware-agnostic and
+ship under [`finetune/configs/`](src/llm_fine_tune/finetune/configs/) (one `<model>-lora.yaml` +
+`<model>-merge.yaml` pair per model); cluster-specific launch scripts live under
+[`finetune/hpc/`](src/llm_fine_tune/finetune/hpc/).
 
-Each config fine-tunes one base model with **LoRA** using `flash_attn: sdpa` — runs on AMD ROCm and NVIDIA CUDA without any FlashAttention library. Multi-GPU training via `torchrun` is automatic. Configs ship under [`src/llm_fine_tune/finetune/configs/`](src/llm_fine_tune/finetune/configs/) (one `<model>-lora.yaml` + `<model>-merge.yaml` pair per model — `llama-3.2-1b`, `qwen2.5-coder-1.5b`, `gemma-3-4b-it`, `mistral-7b-v0.3`, …); pass the one you want as the only argument to `submit.sh`.
-
-The training configs are hardware-agnostic. Cluster-specific scripts live under `hpc/`:
-- **AMD / ROCm / SLURM (Goethe):** [`hpc/goethe/`](src/llm_fine_tune/finetune/hpc/goethe/)
-- **NVIDIA / CUDA / HTCondor (Saarland):** [`hpc/saarland/`](src/llm_fine_tune/finetune/hpc/saarland/)
-
-See [`src/llm_fine_tune/finetune/README.md`](src/llm_fine_tune/finetune/README.md) for the full overview.
-
-To push config edits to the cluster without committing:
+See [`finetune/README.md`](src/llm_fine_tune/finetune/README.md) for the full workflow (config
+structure, multi-GPU, ROCm vs CUDA). To push local config edits to the cluster without committing:
 
 ```bash
 make finetune-sync   # requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env
@@ -218,96 +89,39 @@ make finetune-sync   # requires CLUSTER_HOST and CLUSTER_REPO_DIR in .env
 
 ## Stage 4: Publish the fine-tuned model
 
-LoRA training saves only the adapter deltas — not a standalone model. The publish stage merges those
-deltas into the base weights and pushes the result to HuggingFace under your namespace
-(`tkeskin/<model>-code-translation`). Evaluation (Stage 5) pulls it back from there.
+LoRA training saves only the adapter deltas. This stage merges them into the base weights and pushes
+the standalone model to HuggingFace (`tkeskin/<model>-code-translation`), where Stage 5 pulls it back.
+The merge runs on the cluster (where the adapter, base cache, and venv live).
 
-The merge runs on the cluster (where the adapter, base model cache, and venv live). The publish step
-uses the `publish-model` entry point, which handles repo creation, model card injection, upload, and
-optional version tagging.
-
-**Merge + publish in one SLURM job (Goethe)** — use the `<model>-merge.yaml` matching the config you
-trained with (the Qwen-Coder run is shown):
-```bash
-cd "$REPO_DIR"
-sbatch src/llm_fine_tune/finetune/hpc/goethe/submit-merge.sh \
-    src/llm_fine_tune/finetune/configs/qwen2.5-coder-1.5b-merge.yaml \
-    "$WORK_DIR/saves/qwen2.5-coder-1.5b-lora" \
-    tkeskin/qwen2.5-coder-1.5b-code-translation
-```
-
-**Re-publish an already-merged model** (e.g. after a full training run, or to add a version tag):
-```bash
-source "$REPO_DIR/.venv/bin/activate"
-publish-model \
-    --model-dir "$WORK_DIR/exports/qwen2.5-coder-1.5b-lora" \
-    --repo-id tkeskin/qwen2.5-coder-1.5b-code-translation \
-    --card qwen2.5-coder-1.5b \
-    --message "Fully trained v1 (3 epochs)" \
-    --tag v1
-```
-
-`--card <name>` injects `publish/model_card/<name>.md` as the HuggingFace model card. Available: `llama-3.2-1b`, `qwen-3.5-0.8b`, `gemma-3-1b-it`, `mistral-7b-v0.3`, `qwen2.5-coder-1.5b`. Omit to skip.
-
-See [`src/llm_fine_tune/finetune/hpc/goethe/README.md`](src/llm_fine_tune/finetune/hpc/goethe/README.md)
-for the full merge + publish workflow including HF token requirements.
-
----
+See [`finetune/hpc/goethe/README.md`](src/llm_fine_tune/finetune/hpc/goethe/README.md) for the merge +
+publish workflow (SLURM job, HF token, version tagging), and
+[`publish/model_card/`](src/llm_fine_tune/publish/model_card/README.md) for the model cards injected at
+upload time.
 
 ## Stage 5: Evaluate
 
-Measure whether the fine-tuned model produces translations that actually **compile and run** — not
-just plausible-looking code. The model translates each `code_snippet_to_translate`, and the resulting
-`code_snippet_from_llm_response` is assembled with the row's `execution_engine` and run against its
-`expected_input_output_pairs` in a network-isolated sandbox.
-
-The workflow evaluates **two models pulled from HuggingFace** and compares them: the upstream **base**
-model (the baseline) and the **fine-tune** published in Stage 4. Each runs on the cluster in three
-phases — generation (GPU), sandboxed execution of untrusted model output (Apptainer,
-`--net --network none`), and reporting — and `submit-evaluation.sh` takes an HF repo id directly:
+Measure whether the fine-tune produces translations that actually **compile and run** — not just
+plausible-looking code. The workflow evaluates **two models pulled from HuggingFace** — the upstream
+**base** and the Stage-4 **fine-tune** — and the conclusion is the **delta** between their `pass@1` /
+`compiled` rates. Each runs on the cluster in three phases: generation (GPU), sandboxed execution of
+untrusted model output (Apptainer, `--net --network none`), and reporting.
 
 ```bash
 cd "$REPO_DIR"
 make upload DATASET=evaluation   # publish the evaluation config first (run locally)
 
-# One-time: build the execution sandbox image
-sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation-setup.sh
-
-# Baseline (upstream base model), then the published fine-tune; diff the two summary.md outputs
+sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation-setup.sh   # one-time sandbox build
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh Qwen/Qwen2.5-Coder-1.5B-Instruct
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-evaluation.sh tkeskin/qwen2.5-coder-1.5b-code-translation
 ```
 
-The conclusion is the **delta** between the baseline and fine-tuned `pass@1` / `compiled` rates. See
-[`src/llm_fine_tune/evaluation/README.md`](src/llm_fine_tune/evaluation/README.md) for the full
-architecture, metrics, and how to read the comparison.
-
 A **standard-benchmark track** runs alongside the custom eval, comparing base vs fine-tune on
-recognized benchmarks: held-out perplexity (a), bigcode HumanEval + MultiPL-E pass@1 (b), and
-lm-eval general tasks — mmlu, gsm8k, hellaswag, arc_challenge, winogrande — to catch catastrophic
-forgetting (c). See the [Standard benchmarks section](src/llm_fine_tune/evaluation/README.md#standard-benchmarks-base-vs-fine-tune)
-for the three separate venvs, run commands, and how to read the `benchmark-summary.md` comparison.
+recognized benchmarks: held-out perplexity, HumanEval + MultiPL-E pass@1 via an in-house sandboxed
+runner, and lm-eval general tasks (mmlu, gsm8k, hellaswag, arc_challenge, winogrande) to catch
+catastrophic forgetting.
 
----
-
-## Available commands
-
-```
-make lint        Check code with ruff linting and format checks
-make lf          Fix code with ruff linting and formatting
-make commit      Run lint checks, then create a commitizen commit
-make cz          Alias for 'make commit'
-make bump        Bump the project version using commitizen
-make base        Clone walkccc/LeetCode (if needed) and build the base Parquet dataset
-make instruct    Build the instruct Parquet dataset from the base dataset
-make dataset     Build both the base and instruct datasets
-make clean-data  Remove the cloned source repo and generated output
-make upload      Upload existing Parquet files + dataset card to HuggingFace
-make publish     Build both datasets, then upload them (combines dataset + upload)
-make fertility       Compute tokenizer fertility for sources in tokenizer-sources.txt
-make finetune-sync   Rsync finetune/ configs and scripts to the cluster
-publish-model        Merge + push: upload a merged model directory to HuggingFace
-```
+See [`evaluation/README.md`](src/llm_fine_tune/evaluation/README.md) for the full architecture,
+metrics, the standard-benchmark track, and how to read the comparison.
 
 ---
 
