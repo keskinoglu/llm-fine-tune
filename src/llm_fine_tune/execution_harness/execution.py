@@ -250,6 +250,9 @@ def _failed(diagnostics: str) -> ExecutionResult:
 _PUBLIC_CLASS_RE = re.compile(r"public\s+(?:final\s+)?class\s+(\w+)")
 _ANY_CLASS_RE = re.compile(r"\bclass\s+(\w+)")
 
+# Provisioned in the eval image (evaluation_image.def). MultiPL-E java imports org.javatuples.*.
+_JAVATUPLES_JAR = "/opt/javatuples.jar"
+
 
 def _detect_java_class(source: str) -> str:
     m = _PUBLIC_CLASS_RE.search(source)
@@ -319,18 +322,24 @@ def _self_check_java(source: str, tmp: Path, timeout_s: float) -> dict:
     class_name = _detect_java_class(source)
     src_file = tmp / f"{class_name}.java"
     src_file.write_text(source)
-    compile_result = _compile(_in_container(["javac", "-d", str(tmp), str(src_file)]))
+    # MultiPL-E java prompts unconditionally `import org.javatuples.*` (tuple return types);
+    # the jar is provisioned in the eval image. Absent on the host, where java isn't run.
+    classpath = f"{tmp}:{_JAVATUPLES_JAR}"
+    compile_result = _compile(
+        _in_container(["javac", "-cp", classpath, "-d", str(tmp), str(src_file)])
+    )
     if not compile_result["compiled"]:
         return _self_check_failed(compile_result["diagnostics"])
     return _run_raw(
         _in_container(
             [
                 "java",
+                "-ea",  # MultiPL-E tests use `assert`; without -ea the JVM ignores them (false pass)
                 "-Xmx512m",
                 "-XX:+UseSerialGC",
                 "-XX:ActiveProcessorCount=1",
                 "-cp",
-                str(tmp),
+                classpath,
                 class_name,
             ]
         ),

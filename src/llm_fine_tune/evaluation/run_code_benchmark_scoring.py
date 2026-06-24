@@ -18,14 +18,39 @@ import polars as pl
 from llm_fine_tune.execution_harness import execution
 
 
-def _assemble_multipl_e_program(completion: str, tests: str, language: str) -> str:
+_BRACE_LANGUAGES = {"cpp", "java"}
+
+
+def _function_body(completion: str) -> str:
+    """Return the body between the outermost braces of a complete function/method.
+
+    MultiPL-E's prompt opens the function signature (ends with `... {`) and its tests begin with
+    the matching `}`. The instruct-wrapped model returns a *whole* function, so for brace languages
+    we drop its signature and outer braces and slot just the body into MultiPL-E's own signature.
+    This also makes scoring robust to the model renaming the function — the tests call the name
+    MultiPL-E baked into the prompt, not whatever the model emitted.
+    """
+    open_i = completion.find("{")
+    close_i = completion.rfind("}")
+    if open_i == -1 or close_i == -1 or close_i <= open_i:
+        return completion
+    return completion[open_i + 1 : close_i]
+
+
+def _assemble_multipl_e_program(
+    completion: str, tests: str, language: str, prompt: str
+) -> str:
+    if language in _BRACE_LANGUAGES:
+        return prompt + "\n" + _function_body(completion) + "\n" + tests
+    # Python comes from canonical HumanEval: the model returns a full function that the appended
+    # check(<entry_point>) harness calls by name, so use it whole under the stdlib preamble.
     preamble = execution.language_preamble(language)
     return preamble + "\n" + completion + "\n" + tests
 
 
 def _score_row(row: dict) -> dict:
     program = _assemble_multipl_e_program(
-        row["completion"], row["tests"], row["language"]
+        row["completion"], row["tests"], row["language"], row["prompt"]
     )
     result = execution.compile_and_run_self_checking(program, row["language"])
     return {
