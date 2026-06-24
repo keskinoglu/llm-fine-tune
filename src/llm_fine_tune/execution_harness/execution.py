@@ -9,6 +9,7 @@ reference in dataset validation.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import tempfile
@@ -77,6 +78,11 @@ def language_preamble(language: str) -> str:
             "import java.util.stream.*;\n"
             "import java.util.function.*;"
         )
+    if language in ("rust", "go"):
+        # Rust: the std prelude already has assert_eq!/Vec; an unused `use` is only a warning
+        # (silenced at compile with -A warnings). Go: an unused import is a hard compile error, so
+        # we must never prepend one — the MultiPL-E prompt supplies its own import block.
+        return ""
     raise ValueError(f"Unsupported language: {language!r}")
 
 
@@ -177,8 +183,6 @@ def _execute_java(source: str, tmp: Path, timeout_s: float) -> ExecutionResult:
 
 def _in_container(cmd: list[str]) -> list[str]:
     """Wrap cmd in apptainer exec if EVALUATION_SIF is set."""
-    import os
-
     sif = os.environ.get(_APPTAINER_IMAGE_ENV_VAR, "")
     if sif:
         return ["apptainer", "exec", "--net", "none", sif] + cmd
@@ -347,6 +351,77 @@ def _self_check_java(source: str, tmp: Path, timeout_s: float) -> dict:
     )
 
 
+def _self_check_rust(source: str, tmp: Path, timeout_s: float) -> dict:
+    src_file = tmp / "solution.rs"
+    binary = tmp / "solution"
+    src_file.write_text(source)
+    # -A warnings: MultiPL-E rust carries unused imports/vars; they're warnings, not failures.
+    compile_result = _compile(
+        _in_container(
+            [
+                "rustc",
+                "-O",
+                "--edition",
+                "2021",
+                "-A",
+                "warnings",
+                str(src_file),
+                "-o",
+                str(binary),
+            ]
+        )
+    )
+    if not compile_result["compiled"]:
+        return _self_check_failed(compile_result["diagnostics"])
+    return _run_raw(_in_container([str(binary)]), timeout_s)
+
+
+def _self_check_go(source: str, tmp: Path, timeout_s: float) -> dict:
+    # MultiPL-E go tests use the testing framework (func TestXxx), so we run `go test`, not a binary.
+    # A throwaway module dir + caches/HOME under tmp keep it self-contained and offline (--net none).
+    pkg = tmp / "gopkg"
+    pkg.mkdir(parents=True, exist_ok=True)
+    (pkg / "solution_test.go").write_text(source)
+    (pkg / "go.mod").write_text("module solutiontest\n\ngo 1.19\n")
+    env = {
+        **os.environ,
+        "GOCACHE": str(tmp / "gocache"),
+        "GOPATH": str(tmp / "gopath"),
+        "HOME": str(tmp),
+        "GOPROXY": "off",
+        "GOFLAGS": "-mod=mod",
+    }
+    start = time.perf_counter()
+    try:
+        proc = subprocess.run(
+            _in_container(["go", "test", "./..."]),
+            cwd=str(pkg),
+            env=env,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "compiled": True,
+            "passed": False,
+            "returncode": -1,
+            "diagnostics": "Execution timed out",
+            "runtime_ms": None,
+        }
+    runtime_ms = (time.perf_counter() - start) * 1000
+    output = (proc.stdout or "") + (proc.stderr or "")
+    return {
+        # go test folds compile + run; a compile error prints "[build failed]".
+        "compiled": "[build failed]" not in output,
+        "passed": proc.returncode == 0,
+        "returncode": proc.returncode,
+        "diagnostics": output,
+        "runtime_ms": runtime_ms,
+    }
+
+
 def compile_and_run_self_checking(
     source: str,
     language: str,
@@ -366,5 +441,9 @@ def compile_and_run_self_checking(
             return _self_check_cpp(source, tmp, timeout_s)
         elif language == "java":
             return _self_check_java(source, tmp, timeout_s)
+        elif language == "rust":
+            return _self_check_rust(source, tmp, timeout_s)
+        elif language == "go":
+            return _self_check_go(source, tmp, timeout_s)
         else:
             raise ValueError(f"Unsupported language: {language!r}")

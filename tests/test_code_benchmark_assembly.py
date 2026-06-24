@@ -85,3 +85,83 @@ def test_java_method_source_unwraps_a_returned_class():
 def test_java_method_source_passes_through_a_bare_method():
     completion = "public static int f() { return 1; }"
     assert _java_method_source(completion) == completion
+
+
+# ---------------------------------------------------------------------------
+# Rust — same shape as C++ (prompt opens a free fn, tests close it + a main of asserts)
+# ---------------------------------------------------------------------------
+
+RUST_PROMPT = (
+    "/// Check if any two numbers are closer than threshold.\n"
+    "fn has_close_elements(numbers: Vec<f64>, threshold: f64) -> bool {\n"
+)
+RUST_TESTS = (
+    "}\n\n"
+    "fn main() {\n"
+    "    let candidate = has_close_elements;\n"
+    "    assert_eq!(candidate(vec![1.0, 2.0, 3.9], 0.3), true);\n"
+    "}\n"
+)
+_RUST_SIG = "fn has_close_elements(numbers: Vec<f64>, threshold: f64) -> bool"
+
+
+def test_rust_assembly_is_wellformed():
+    completion = (
+        "fn has_close_elements(numbers: Vec<f64>, threshold: f64) -> bool {\n"
+        "    for i in 0..numbers.len() {\n"
+        "        for j in (i + 1)..numbers.len() {\n"
+        "            if (numbers[i] - numbers[j]).abs() < threshold { return true; }\n"
+        "        }\n"
+        "    }\n"
+        "    false\n"
+        "}"
+    )
+    program = _assemble_multipl_e_program(completion, RUST_TESTS, "rust", RUST_PROMPT)
+    assert _braces_balanced(program)
+    assert (
+        program.count(_RUST_SIG) == 1
+    )  # signature from the prompt, body sliced from completion
+    assert "fn main()" in program
+
+
+# ---------------------------------------------------------------------------
+# Go — testing framework; prompt carries package + imports; tests don't close the fn
+# ---------------------------------------------------------------------------
+
+GO_PROMPT = (
+    "package has_close_elements_test\n\n"
+    "import (\n"
+    '    "testing"\n'
+    '    "math"\n'
+    ")\n\n"
+    "// Check if any two numbers are closer than threshold.\n"
+    "func has_close_elements(numbers []float64, threshold float64) bool {\n"
+)
+GO_TESTS = (
+    "func TestHasCloseElements(t *testing.T) {\n"
+    "    candidate := has_close_elements\n"
+    '    if candidate([]float64{1.0, 2.0}, 0.3) != false { t.Error("fail") }\n'
+    "}\n"
+)
+_GO_SIG = "func has_close_elements(numbers []float64, threshold float64) bool"
+
+
+def test_go_assembly_is_wellformed():
+    completion = (
+        "func has_close_elements(numbers []float64, threshold float64) bool {\n"
+        "    for i := 0; i < len(numbers); i++ {\n"
+        "        for j := i + 1; j < len(numbers); j++ {\n"
+        "            if math.Abs(numbers[i]-numbers[j]) < threshold { return true }\n"
+        "        }\n"
+        "    }\n"
+        "    return false\n"
+        "}"
+    )
+    program = _assemble_multipl_e_program(completion, GO_TESTS, "go", GO_PROMPT)
+    assert _braces_balanced(program)
+    assert "package has_close_elements_test" in program
+    assert "import (" in program
+    assert (
+        program.count(_GO_SIG) == 1
+    )  # from the model's completion, prompt's open sig dropped
+    assert "func TestHasCloseElements" in program

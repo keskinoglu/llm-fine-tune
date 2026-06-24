@@ -30,7 +30,12 @@ _HUMANEVAL_REPO = "openai/openai_humaneval"
 
 # MultiPL-E config suffix -> (our execution language token, display name for the instruction).
 # Python is not in MultiPL-E (it is the source language); it is handled separately below.
-_MULTIPL_E_LANGS = {"cpp": ("cpp", "C++"), "java": ("java", "Java")}
+_MULTIPL_E_LANGS = {
+    "cpp": ("cpp", "C++"),
+    "java": ("java", "Java"),
+    "rs": ("rust", "Rust"),
+    "go": ("go", "Go"),
+}
 _PYTHON_CONFIGS = {"humaneval-py", "humaneval-python"}
 
 

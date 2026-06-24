@@ -23,6 +23,8 @@ From: python:3.11-slim-bookworm
     apt-get update && apt-get install -y --no-install-recommends \
         g++ \
         openjdk-17-jdk-headless \
+        rustc \
+        golang-go \
         && rm -rf /var/lib/apt/lists/*
     # MultiPL-E java prompts import org.javatuples.* (tuple return types); put the jar where
     # execution.py's java classpath expects it. Fetched with the base image's python (no curl/wget).

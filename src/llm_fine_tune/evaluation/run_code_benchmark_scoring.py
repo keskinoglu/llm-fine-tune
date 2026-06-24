@@ -21,6 +21,7 @@ from llm_fine_tune.execution_harness import execution
 
 _JAVA_CLASS_NAME_RE = re.compile(r"\bclass\s+(\w+)")
 _JAVA_CLASS_OPEN_RE = re.compile(r"\bclass\s+\w+[^{]*\{", re.DOTALL)
+_GO_FUNC_OPEN_RE = re.compile(r"\bfunc\s+\w+\s*\(")
 
 
 def _function_body(completion: str) -> str:
@@ -82,12 +83,26 @@ def _assemble_java(prompt: str, completion: str, tests: str) -> str:
     return f"{imports}\nclass {class_name} {{\n{methods}\n{main}\n}}\n"
 
 
+def _assemble_go(prompt: str, completion: str, tests: str) -> str:
+    """Rebuild a Go test program: prompt header (package + imports + docstring) + the model's whole
+    function + the test harness. MultiPL-E's go tests use the testing framework (func TestXxx) and do
+    not supply the function's closing brace, so the model's complete function is used as-is (not
+    body-extracted). The header is everything before the prompt's own function signature."""
+    matches = list(_GO_FUNC_OPEN_RE.finditer(prompt))
+    header = prompt[: matches[-1].start()] if matches else prompt
+    return header + completion + "\n" + tests
+
+
 def _assemble_multipl_e_program(
     completion: str, tests: str, language: str, prompt: str
 ) -> str:
     if language == "java":
         return _assemble_java(prompt, completion, tests)
-    if language == "cpp":
+    if language == "go":
+        return _assemble_go(prompt, completion, tests)
+    if language in ("cpp", "rust"):
+        # Free-function languages: the prompt opens the signature, the tests close it with the
+        # matching `}`. Slot the model's body into MultiPL-E's own signature.
         return prompt + "\n" + _function_body(completion) + "\n" + tests
     # Python comes from canonical HumanEval: the model returns a full function that the appended
     # check(<entry_point>) harness calls by name, so use it whole under the stdlib preamble.
