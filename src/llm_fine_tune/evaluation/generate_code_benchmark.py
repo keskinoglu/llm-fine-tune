@@ -1,8 +1,14 @@
-"""Phase 3 (code-benchmark track): generate MultiPL-E completions with an instruct-wrapped prompt.
+"""Phase 3 (code-benchmark track): generate HumanEval/MultiPL-E completions with an instruct prompt.
 
-Loads each humaneval-{cpp,java,py} config from nuprl/MultiPL-E, wraps each prompt as a chat
-instruction, generates via the model, extracts code, and writes code_benchmark_generations.parquet
-plus a raw JSON debug file — both from the same rows in order so Phase-4 can pair by index.
+The non-Python languages come from nuprl/MultiPL-E (HumanEval translated out of Python), which
+ships a self-checking test harness per row. Python is the source language of MultiPL-E and so has
+no config there; it comes from the canonical openai/openai_humaneval, whose `test` defines a
+`check(candidate)` function that we close over the entry point to make self-checking too.
+
+Each config is normalized to the same row shape — name, language, prompt, tests, completion — so
+Phase-4 scoring (assemble preamble + completion + tests, run, pass = exit 0) is source-agnostic.
+We wrap each prompt as a chat instruction, generate, extract the code, and write
+code_benchmark_generations.parquet plus a raw JSON debug file in row order so Phase-4 pairs by index.
 """
 
 from __future__ import annotations
@@ -20,12 +26,61 @@ from llm_fine_tune.evaluation import extract_code_snippet_from_llm_response as e
 from llm_fine_tune.evaluation.generation import generate_completions
 
 _MULTIPL_E_REPO = "nuprl/MultiPL-E"
-_LANG_MAP = {"cpp": "cpp", "java": "java", "py": "python"}
+_HUMANEVAL_REPO = "openai/openai_humaneval"
+
+# MultiPL-E config suffix -> (our execution language token, display name for the instruction).
+# Python is not in MultiPL-E (it is the source language); it is handled separately below.
+_MULTIPL_E_LANGS = {"cpp": ("cpp", "C++"), "java": ("java", "Java")}
+_PYTHON_CONFIGS = {"humaneval-py", "humaneval-python"}
 
 
-def _render_prompt(tokenizer, lang_suffix: str, prompt_text: str) -> str:
+def _load_normalized_rows(config: str, limit: int | None) -> list[dict]:
+    """Return rows shaped {name, language, prompt, tests} for any supported config.
+
+    `tests` is a self-checking harness in the row's language: appending the model's completion
+    and running it exits 0 iff every assertion passes.
+    """
+    if config in _PYTHON_CONFIGS:
+        rows = list(load_dataset(_HUMANEVAL_REPO)["test"])
+        if limit:
+            rows = rows[:limit]
+        return [
+            {
+                "name": r["task_id"],
+                "language": "python",
+                "display": "Python",
+                "prompt": r["prompt"],
+                # `test` defines check(candidate); close it over the function name to self-check.
+                "tests": r["test"] + f"\n\ncheck({r['entry_point']})\n",
+            }
+            for r in rows
+        ]
+
+    suffix = config.split("-")[-1]  # "humaneval-cpp" → "cpp"
+    if suffix not in _MULTIPL_E_LANGS:
+        raise ValueError(
+            f"Unsupported config {config!r}; supported suffixes: "
+            f"{sorted(_MULTIPL_E_LANGS)} plus python via {sorted(_PYTHON_CONFIGS)}"
+        )
+    language, display = _MULTIPL_E_LANGS[suffix]
+    rows = list(load_dataset(_MULTIPL_E_REPO, config)["test"])
+    if limit:
+        rows = rows[:limit]
+    return [
+        {
+            "name": r["name"],
+            "language": language,
+            "display": display,
+            "prompt": r["prompt"],
+            "tests": r["tests"],
+        }
+        for r in rows
+    ]
+
+
+def _render_prompt(tokenizer, display: str, prompt_text: str) -> str:
     content = (
-        f"Complete this {lang_suffix} function. "
+        f"Complete this {display} function. "
         f"Respond with only the complete function in a single code block.\n\n{prompt_text}"
     )
     if tokenizer.chat_template:
@@ -57,14 +112,9 @@ def main() -> None:
     raw_by_config: dict[str, list[str]] = {}
 
     for config in configs:
-        lang_suffix = config.split("-")[-1]  # "humaneval-cpp" → "cpp"
-        language = _LANG_MAP[lang_suffix]
+        rows = _load_normalized_rows(config, args.limit)
 
-        rows = list(load_dataset(_MULTIPL_E_REPO, config)["test"])
-        if args.limit:
-            rows = rows[: args.limit]
-
-        prompts = [_render_prompt(tokenizer, lang_suffix, r["prompt"]) for r in rows]
+        prompts = [_render_prompt(tokenizer, r["display"], r["prompt"]) for r in rows]
         completions = generate_completions(
             model,
             tokenizer,
@@ -77,13 +127,13 @@ def main() -> None:
         raw_by_config[config] = completions
         for row, raw_completion in zip(rows, completions):
             extracted = extractor.extract_code_snippet_from_llm_response(
-                raw_completion, language
+                raw_completion, row["language"]
             )
             all_rows.append(
                 {
                     "config": config,
                     "name": row["name"],
-                    "language": language,
+                    "language": row["language"],
                     "prompt": row["prompt"],
                     "tests": row["tests"],
                     "completion": extracted,
