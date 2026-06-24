@@ -53,6 +53,33 @@ class ExecutionResult(TypedDict):
     runtime_ms: float | None
 
 
+def language_preamble(language: str) -> str:
+    """Return the language-specific import preamble (no node definitions) for *language*."""
+    if language == "cpp":
+        return "#include <bits/stdc++.h>\nusing namespace std;"
+    if language == "python":
+        # LeetCode solutions assume these are pre-imported (no explicit imports in submissions).
+        return (
+            "import bisect, collections, functools, heapq, itertools, math, string\n"
+            "from bisect import bisect_left, bisect_right, insort_left, insort_right\n"
+            "from collections import Counter, defaultdict, deque, OrderedDict\n"
+            "from functools import reduce, lru_cache, cache\n"
+            "from heapq import heappush, heappop, heapify, nlargest, nsmallest\n"
+            "from itertools import product, permutations, combinations, combinations_with_replacement, accumulate\n"
+            "from math import gcd, sqrt, log, floor, ceil, inf, factorial, isqrt\n"
+            "from typing import Dict, List, Optional, Set, Tuple"
+        )
+    if language == "java":
+        # walkccc/LeetCode Java assumes java.util.*, java.util.stream.*, and
+        # java.util.function.* are in scope (LeetCode auto-imports them).
+        return (
+            "import java.util.*;\n"
+            "import java.util.stream.*;\n"
+            "import java.util.function.*;"
+        )
+    raise ValueError(f"Unsupported language: {language!r}")
+
+
 def assemble_code_snippet_with_execution_wiring(
     code_snippet: str,
     execution_engine: str,
@@ -66,35 +93,12 @@ def assemble_code_snippet_with_execution_wiring(
     definitions = datatypes.node_definitions(language)
     body = code_snippet + "\n" + execution_engine
     if language == "cpp":
-        return (
-            "#include <bits/stdc++.h>\nusing namespace std;\n\n"
-            + definitions
-            + "\n"
-            + body
-        )
+        return language_preamble(language) + "\n\n" + definitions + "\n" + body
     if language == "python":
-        # LeetCode solutions assume these are pre-imported (no explicit imports in submissions).
-        stdlib = (
-            "import bisect, collections, functools, heapq, itertools, math, string\n"
-            "from bisect import bisect_left, bisect_right, insort_left, insort_right\n"
-            "from collections import Counter, defaultdict, deque, OrderedDict\n"
-            "from functools import reduce, lru_cache, cache\n"
-            "from heapq import heappush, heappop, heapify, nlargest, nsmallest\n"
-            "from itertools import product, permutations, combinations, combinations_with_replacement, accumulate\n"
-            "from math import gcd, sqrt, log, floor, ceil, inf, factorial, isqrt\n"
-            "from typing import Dict, List, Optional, Set, Tuple\n"
-        )
-        return stdlib + "\n" + definitions + "\n" + body
+        return language_preamble(language) + "\n\n" + definitions + "\n" + body
     if language == "java":
-        # walkccc/LeetCode Java assumes java.util.*, java.util.stream.*, and
-        # java.util.function.* are in scope (LeetCode auto-imports them).
-        imports = (
-            "import java.util.*;\n"
-            "import java.util.stream.*;\n"
-            "import java.util.function.*;\n\n"
-        )
         pair = "" if _JAVA_DEFINES_PAIR.search(body) else _JAVA_PAIR_DEF
-        return imports + pair + definitions + "\n" + body
+        return language_preamble(language) + "\n\n" + pair + definitions + "\n" + body
     return definitions + "\n" + body
 
 
@@ -239,3 +243,119 @@ def _failed(diagnostics: str) -> ExecutionResult:
         "input_output_pairs_from_code_snippet": [],
         "runtime_ms": None,
     }
+
+
+# ---- Self-checking runner (MultiPL-E / pass@1 style) ----
+
+_PUBLIC_CLASS_RE = re.compile(r"public\s+(?:final\s+)?class\s+(\w+)")
+_ANY_CLASS_RE = re.compile(r"\bclass\s+(\w+)")
+
+
+def _detect_java_class(source: str) -> str:
+    m = _PUBLIC_CLASS_RE.search(source)
+    if m:
+        return m.group(1)
+    m = _ANY_CLASS_RE.search(source)
+    if m:
+        return m.group(1)
+    return "Main"
+
+
+def _run_raw(cmd: list[str], timeout_s: float) -> dict:
+    """Run *cmd* and return raw exit-code result (not OK/FAIL parsing)."""
+    start = time.perf_counter()
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, errors="replace", timeout=timeout_s
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "compiled": True,
+            "passed": False,
+            "returncode": -1,
+            "diagnostics": "Execution timed out",
+            "runtime_ms": None,
+        }
+    runtime_ms = (time.perf_counter() - start) * 1000
+    passed = proc.returncode == 0
+    return {
+        "compiled": True,
+        "passed": passed,
+        "returncode": proc.returncode,
+        "diagnostics": proc.stderr or proc.stdout,
+        "runtime_ms": runtime_ms,
+    }
+
+
+def _self_check_failed(diagnostics: str) -> dict:
+    return {
+        "compiled": False,
+        "passed": False,
+        "returncode": -1,
+        "diagnostics": diagnostics,
+        "runtime_ms": None,
+    }
+
+
+def _self_check_python(source: str, tmp: Path, timeout_s: float) -> dict:
+    src_file = tmp / "solution.py"
+    src_file.write_text(source)
+    return _run_raw(_in_container(["python3", str(src_file)]), timeout_s)
+
+
+def _self_check_cpp(source: str, tmp: Path, timeout_s: float) -> dict:
+    src_file = tmp / "solution.cpp"
+    binary = tmp / "solution"
+    src_file.write_text(source)
+    compile_result = _compile(
+        _in_container(["g++", "-O2", "-std=c++20", str(src_file), "-o", str(binary)])
+    )
+    if not compile_result["compiled"]:
+        return _self_check_failed(compile_result["diagnostics"])
+    return _run_raw(_in_container([str(binary)]), timeout_s)
+
+
+def _self_check_java(source: str, tmp: Path, timeout_s: float) -> dict:
+    class_name = _detect_java_class(source)
+    src_file = tmp / f"{class_name}.java"
+    src_file.write_text(source)
+    compile_result = _compile(_in_container(["javac", "-d", str(tmp), str(src_file)]))
+    if not compile_result["compiled"]:
+        return _self_check_failed(compile_result["diagnostics"])
+    return _run_raw(
+        _in_container(
+            [
+                "java",
+                "-Xmx512m",
+                "-XX:+UseSerialGC",
+                "-XX:ActiveProcessorCount=1",
+                "-cp",
+                str(tmp),
+                class_name,
+            ]
+        ),
+        timeout_s,
+    )
+
+
+def compile_and_run_self_checking(
+    source: str,
+    language: str,
+    *,
+    timeout_s: float = 15.0,
+) -> dict:
+    """Compile and run a self-checking program; pass = exit 0.
+
+    Returns ``{"compiled": bool, "passed": bool, "returncode": int,
+    "diagnostics": str, "runtime_ms": float | None}``.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        if language == "python":
+            return _self_check_python(source, tmp, timeout_s)
+        elif language == "cpp":
+            return _self_check_cpp(source, tmp, timeout_s)
+        elif language == "java":
+            return _self_check_java(source, tmp, timeout_s)
+        else:
+            raise ValueError(f"Unsupported language: {language!r}")

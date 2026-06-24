@@ -16,6 +16,8 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from llm_fine_tune.evaluation.generation import generate_completions
+
 _DATASET_PATH = "tkeskin/leetcode-solutions"
 _DATASET_CONFIG = "evaluation"
 
@@ -53,27 +55,16 @@ def main() -> None:
     )
     model.eval()
 
-    gen_kwargs = {
-        "max_new_tokens": args.max_new_tokens,
-        "pad_token_id": tokenizer.pad_token_id,
-    }
-    if args.temperature and args.temperature > 0:
-        gen_kwargs.update(do_sample=True, temperature=args.temperature)
-    else:
-        gen_kwargs.update(do_sample=False)
-
     prompts = [_render_prompt(tokenizer, p) for p in payloads]
-    generations = []
-    for start in range(0, len(prompts), args.batch_size):
-        inputs = tokenizer(
-            prompts[start : start + args.batch_size],
-            return_tensors="pt",
-            padding=True,
-        ).to(model.device)
-        with torch.no_grad():
-            output = model.generate(**inputs, **gen_kwargs)
-        for sequence in output[:, inputs["input_ids"].shape[1] :]:
-            generations.append([tokenizer.decode(sequence, skip_special_tokens=True)])
+    raw = generate_completions(
+        model,
+        tokenizer,
+        prompts,
+        max_new_tokens=args.max_new_tokens,
+        temperature=args.temperature or 0.0,
+        batch_size=args.batch_size,
+    )
+    generations = [[r] for r in raw]
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

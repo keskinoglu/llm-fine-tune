@@ -3,7 +3,7 @@
 Ingests, for each model result directory:
   perplexity.json               — from compute-heldout-perplexity
   lmeval/<model>/results_*.json — from lm_eval (nested, timestamped; located by glob)
-  bigcode_<task>.json           — one per bigcode task (humaneval, multiple-cpp, -java, -py)
+  code_benchmark_metrics.json   — from run-code-benchmark-scoring (HumanEval × cpp/java/py)
 
 Emits benchmark-summary.md (base / fine-tune / delta table) + benchmark-results.parquet.
 
@@ -21,7 +21,7 @@ import polars as pl
 
 from llm_fine_tune import loaders
 
-_BIGCODE_TASKS = ["humaneval", "multiple-cpp", "multiple-java", "multiple-py"]
+_CODE_BENCH_CONFIGS = ["humaneval-cpp", "humaneval-java", "humaneval-py"]
 
 _LMEVAL_METRICS: dict[str, str] = {
     "mmlu": "acc,none",
@@ -65,27 +65,21 @@ def _lmeval_values(result_dir: Path) -> dict[str, float | None]:
     }
 
 
-def _bigcode_values(result_dir: Path) -> dict[str, float | None]:
-    out: dict[str, float | None] = {}
-    for task in _BIGCODE_TASKS:
-        data = _load_json(result_dir / f"bigcode_{task}.json")
-        if data is None:
-            out[task] = None
-            continue
-        # bigcode writes {"pass@1": v} or {task: {"pass@1": v}}
-        if "pass@1" in data:
-            out[task] = data["pass@1"]
-        else:
-            nested = next(iter(data.values()), {})
-            out[task] = nested.get("pass@1") if isinstance(nested, dict) else None
-    return out
+def _code_benchmark_values(result_dir: Path) -> dict[str, float | None]:
+    data = _load_json(result_dir / "code_benchmark_metrics.json")
+    if not data:
+        return {config: None for config in _CODE_BENCH_CONFIGS}
+    summary = data.get("summary", {})
+    return {
+        config: summary.get(config, {}).get("pass@1") for config in _CODE_BENCH_CONFIGS
+    }
 
 
 def _collect(result_dir: Path) -> dict[str, float | None]:
     row: dict[str, float | None] = {}
     row["perplexity"] = _perplexity_value(result_dir)
     row.update(_lmeval_values(result_dir))
-    row.update(_bigcode_values(result_dir))
+    row.update(_code_benchmark_values(result_dir))
     return row
 
 
@@ -130,10 +124,9 @@ def _build_summary(base_dir: Path, ft_dir: Path) -> tuple[str, pl.DataFrame]:
         ("hellaswag", "hellaswag acc_norm (↑)", True, False),
         ("arc_challenge", "arc_challenge acc_norm (↑)", True, False),
         ("winogrande", "winogrande acc (↑)", True, False),
-        ("humaneval", "HumanEval pass@1 (↑)", True, False),
-        ("multiple-cpp", "MultiPL-E cpp pass@1 (↑)", True, False),
-        ("multiple-java", "MultiPL-E java pass@1 (↑)", True, False),
-        ("multiple-py", "MultiPL-E py pass@1 (↑)", True, False),
+        ("humaneval-cpp", "HumanEval cpp pass@1 (↑)", True, False),
+        ("humaneval-java", "HumanEval java pass@1 (↑)", True, False),
+        ("humaneval-py", "HumanEval py pass@1 (↑)", True, False),
     ]
 
     header = f"| Metric | base ({base_model}) | fine-tune ({ft_model}) | Δ |\n"

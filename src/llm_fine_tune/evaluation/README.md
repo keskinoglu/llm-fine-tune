@@ -165,43 +165,42 @@ Alongside the custom translation eval, a **standard-benchmark track** answers th
 | Question | Tool / metric | Untrusted exec? |
 |---|---|---|
 | **(a) Did training work?** | Held-out perplexity on `leetcode_instruct_test` | no |
-| **(b) Did code ability improve?** | bigcode HumanEval + MultiPL-E (`cpp`/`java`/`py`) pass@1 | yes (container) |
+| **(b) Did code ability improve?** | Our MultiPL-E runner: HumanEval × {cpp, java, py} pass@1 | yes (container) |
 | **(c) Did general ability regress?** | lm-eval `mmlu`, `gsm8k`, `hellaswag`, `arc_challenge`, `winogrande` | no |
 
 Run both models through `submit-benchmark.sh`; compare with `benchmark-report`.
 
 ### Environments
 
-Three separate environments, none touching the training `.venv`. The two Python ones are
-**declarative uv sub-projects** (`pyproject.toml` + `uv sync`, torch routed to the ROCm index in each)
-so they're reproducible and can't constrain llamafactory; run them with `uv run --project <dir>`:
+Two separate environments, neither touching the training `.venv`:
 
 | Environment | Purpose | Built by |
 |---|---|---|
-| `images/bigcode-multiple` | Apptainer sandbox — runs generated code (CPU, `--net none`) | `submit-benchmark-setup.sh` |
-| `eval-envs/bigcode-gen` | bigcode `main.py` generation (GPU, ROCm torch) | `submit-benchmark-setup.sh` |
+| `images/evaluation` | Apptainer sandbox — runs generated code (CPU, `--net none`) | `submit-evaluation-setup.sh` |
 | `eval-envs/lmeval` | `lm-eval` general tasks (GPU, ROCm torch) | `submit-benchmark-setup.sh` |
 
-The bigcode CUDA image is used **only for execution** (Phase 4 — CPU, no model). Generation runs in
-the ROCm `eval-envs/bigcode-gen` env, which avoids the CUDA/ROCm conflict. (Perplexity (a) runs in the
-project `.venv`, which already has ROCm torch and our package.)
+Phase 3 (MultiPL-E generation) runs in the **project `.venv`** — plain transformers inference, no
+sandbox needed. Phase 4 (execution) reuses the **translation-eval image** (`images/evaluation`)
+which already has g++, javac, and python3. The `lmeval` env is a declarative uv sub-project
+(`pyproject.toml` + `uv sync`, torch routed to the ROCm index).
 
 ### Running on the cluster (Goethe)
 
 ```bash
 cd "$REPO_DIR"
 
-# One-time: build the bigcode sandbox + two generation venvs (~3–6h, general1 partition)
+# One-time: sync the lmeval env (~minutes, general1 partition)
+# (images/evaluation is built by submit-evaluation-setup.sh — run that first if not already done)
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark-setup.sh
 
-# Smoke-test the sandbox after setup
-apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" g++ --version
-apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" javac -version
-apptainer exec --net --network none "$WORK_DIR/images/bigcode-multiple" python3 /app/main.py --help
+# Smoke-test the execution sandbox
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" g++ --version
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" javac -version
+apptainer exec --net --network none "$WORK_DIR/images/evaluation" python3 --version
 
-# Shakeout with --limit 10 on each task before the full run
+# Shakeout with --limit 5 before the full run
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh \
-    Qwen/Qwen2.5-Coder-1.5B-Instruct --limit 10
+    Qwen/Qwen2.5-Coder-1.5B-Instruct --limit 5
 
 # Full core-curated run — base model, then fine-tune
 sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh Qwen/Qwen2.5-Coder-1.5B-Instruct
@@ -221,15 +220,16 @@ Each `submit-benchmark.sh` run writes into `$WORK_DIR/benchmark-results/<model>-
 |---|---|
 | `perplexity.json` | Phase 1 (`compute-heldout-perplexity`) |
 | `lmeval/<model>/results_*.json` | Phase 2 (`lm_eval`, nested + timestamped) |
-| `generations_<task>.json` | Phase 3 (bigcode `--generation_only`) |
-| `bigcode_<task>.json` | Phase 4 (bigcode `--allow_code_execution` in-container) |
+| `code_benchmark_generations.parquet` | Phase 3 (`generate-code-benchmark`) |
+| `code_benchmark_generations.json` | Phase 3 (raw responses, debug) |
+| `code_benchmark_metrics.json` | Phase 4 (`run-code-benchmark-scoring`) |
 
 ### Reading the standard benchmark comparison
 
 `benchmark-report` produces a single `benchmark-summary.md` with base / fine-tune / Δ columns:
 
 - **(a) perplexity** — lower is better; a drop confirms the fine-tune learned from the training distribution. Sanity anchor: `Qwen2.5-Coder-1.5B-Instruct` baseline should be in the single-digit range on this domain-specific test split.
-- **(b) HumanEval / MultiPL-E pass@1** — code benchmarks; expect the fine-tune to hold flat-or-up on MultiPL-E (same languages as training). Sanity anchors for qwen2.5-coder-1.5b: HumanEval ≈ 40–55%.
+- **(b) HumanEval cpp/java/py pass@1** — code benchmarks via our MultiPL-E runner; expect the fine-tune to hold flat-or-up. Sanity anchor for qwen2.5-coder-1.5b-instruct: humaneval-py pass@1 ≈ 0.5–0.7.
 - **(c) mmlu / gsm8k / hellaswag / arc_challenge / winogrande** — general-capability probes; a large drop here signals catastrophic forgetting and is worth reporting separately.
 
 ---

@@ -25,27 +25,26 @@ Same eval, every published base→fine-tune pair. Overall pass@1, n-weighted acr
 | base → fine-tune | base | ft | Δ |
 |---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 29.3% | 61.9% | **+32.6** |
+| Mistral-7B-Instruct-v0.3 | 11.8% | 59.6% | **+47.8** |
 | gemma-3-4b-it | 27.9% | 52.9% | **+25.0** |
 | Llama-3.2-1B-Instruct | 17.5% | 32.5% | +15.0 |
 | Qwen3.5-0.8B | 16.2% | 15.7% | **−0.5** |
-| Mistral-7B-Instruct-v0.3 | 11.8% | _pending_ | ft re-merge done; publish + re-eval |
 
-The effect is **strongly model-dependent** — that's the cross-model headline:
-- **Qwen2.5-Coder-1.5B** (code-pretrained) gains the most; it already "speaks" the target languages, so
-  SFT on translations sharpens format + correctness hard.
-- **gemma-3-4b-it** gains nearly as much (**+25**) — the largest *working* fine-tune, lifting a mid base
-  to second place. Capacity + a clean instruct base convert the SFT well.
-- **Llama-3.2-1B** (general 1B) gains solidly (+15) from a lower base.
+All five pairs complete. **Four of five fine-tunes improve substantially (+15 to +48 points); only the
+0.8B model fails to transfer.** The cross-model story is about **capacity, not starting quality**:
+- **Mistral-7B** has the **weakest base of all (11.8%** — it barely emits compilable C++/Java) yet shows
+  the **largest gain (+47.8**, a ~5× jump) to near the top. The 7B had the most capacity to absorb the
+  SFT, even from a poor start.
+- **Qwen2.5-Coder-1.5B** reaches the **highest absolute** (61.9%) — a code-pretrained base converts the
+  SFT most efficiently per parameter.
+- **gemma-3-4b-it** gains a clean **+25** from a mid base.
+- **Llama-3.2-1B** gains solidly **+15** from a low base.
 - **Qwen3.5-0.8B** shows **no transfer** — flat, fractionally worse. The smallest model (and an unusual
   linear-attention arch) didn't convert the SFT into translation skill. An honest negative result.
-- **Mistral-7B-v0.3** has the **weakest base of all (11.8%)** despite being the largest — it rarely emits
-  compilable C++/Java out of the box. Its fine-tune is pending a republish (the first upload shipped a
-  corrupt config; re-merged correctly, awaiting re-eval).
 
-Across the four completed pairs, the gain tracks the *base's* code competence and size more than raw
-parameter count: the code model and the 4B instruct model gain most, the 0.8B not at all. The detailed
-tables below are the **qwen2.5-coder-1.5b deep dive** (the lead result); per-model detail belongs in
-each model's HuggingFace card.
+So the gain rises with model **size/capacity**; below ~1B it vanishes, and a code-pretrained base wins
+on absolute score. The detailed tables below are the **qwen2.5-coder-1.5b deep dive** (the lead result);
+per-model detail belongs in each model's HuggingFace card.
 
 ## Headline — qwen2.5-coder-1.5b (n-weighted over all 3,336 payloads)
 
@@ -134,8 +133,9 @@ Every one of the 18 (source × target × difficulty) cells improved — no regre
 ## Open (not yet measured — do NOT claim)
 
 - [x] **`redefinition` outcome share** base vs ft — measured: 198 (5.9%) → 0. See outcome breakdown.
-- [~] **Other 4 models** — llama-3.2-1b ✓, qwen3.5-0.8b ✓, gemma-3-4b-it ✓ (see cross-model summary);
-      mistral-7b-v0.3 base ✓ but its fine-tune awaits a republish (first upload had a corrupt config).
+- [x] **All 5 models** — llama-3.2-1b, qwen3.5-0.8b, gemma-3-4b-it, qwen2.5-coder-1.5b, mistral-7b-v0.3
+      all complete base + ft (see cross-model summary). Mistral's ft needed a republish (corrupt config
+      on first upload), now fixed.
 - [ ] **(a) Did training work, traditionally?** Held-out perplexity base vs ft. Not run.
 - [ ] **(c) General-ability regression?** lm-eval (mmlu/gsm8k/...). Benchmark track not set up/run.
 - [ ] **(b) Standard code benchmarks** (HumanEval, MultiPL-E) for an external comparison point. Not run.
