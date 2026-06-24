@@ -147,8 +147,8 @@ the translation eval.
 
 Measured on the **completion tokens only** (the reference target translation, prompt masked from the
 loss), and the test split was held out of training — so this is generalization of fit, not
-memorization. The per-token cross-entropy fell from 0.253 to 0.065 nats (~74% lower): a clean,
-traditional confirmation the SFT did what it should on its own distribution. (Absolute perplexity sits
+memorization. The per-token cross-entropy fell from 0.253 to 0.065 nats (~74% lower) — the SFT fit its
+own distribution. (Absolute perplexity sits
 near 1 because a translation target is tightly constrained by its source — much of it mirrors the
 input's identifiers, literals, and structure — so each token is highly predictable; the base-vs-ft
 *gap* is the point, not the absolute level.)
@@ -215,8 +215,8 @@ base-vs-ft Java numbers await a compute-node re-score. Java is excluded from the
 Narrow fine-tuning **narrowed the output distribution to the trained idiom**. The same ft that gains
 **+32.6 on translation** (its trained format) loses **~22 on HumanEval-Python** (a foreign format) —
 better at its dialect, worse at others — while general knowledge (MMLU) is untouched. This is
-over-specialization / distribution narrowing, the textbook cost of SFT on a narrow task, and exactly
-what a benchmark track is for: the translation eval alone would have hidden it.
+over-specialization / distribution narrowing from narrow fine-tuning. The translation eval alone would
+have missed it; the benchmark track is what surfaced it.
 
 ## Open (not yet measured — do NOT claim)
 

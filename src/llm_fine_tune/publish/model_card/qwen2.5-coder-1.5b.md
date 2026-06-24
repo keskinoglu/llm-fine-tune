@@ -66,13 +66,13 @@ The base model also redefined the harness-provided `ListNode`/`TreeNode` helper 
 
 ### Standard benchmarks and the specialization trade-off
 
-Specializing on translation has a cost worth stating plainly. On standard benchmarks (base → this model):
+Translation specialization has a measurable cost on standard benchmarks (base → this model):
 
 - **Held-out perplexity** on the translation test set drops **1.29 → 1.07** — training fit the target distribution.
 - **General ability is preserved** — MMLU is flat (**0.512 → 0.514**); lm-eval reasoning tasks unchanged within noise.
 - **Code generation _from a natural-language spec_ regresses** — HumanEval pass@1 (Python) **75% → 53%**.
 
-That regression is mostly **output-format specialization, not lost ability**. Trained on LeetCode solutions — which wrap every answer in `class Solution { ... }` with camelCase methods — the model now answers HumanEval-style prompts in that same idiom, e.g. emitting `class Solution { bool hasCloseElements(...) }` instead of the requested free `has_close_elements(...)`. The logic is frequently correct; it simply mismatches the benchmark's free-function contract (C++ class-wrapping rises from **0% in the base to 78%** here). In short: the model got better at its trained format and worse at foreign ones, while keeping its general knowledge intact.
+That regression is mostly **output-format specialization, not lost ability**. Trained on LeetCode solutions — which wrap every answer in `class Solution { ... }` with camelCase methods — the model now answers HumanEval-style prompts in that same idiom, e.g. emitting `class Solution { bool hasCloseElements(...) }` instead of the requested free `has_close_elements(...)`. The logic is frequently correct but mismatches the benchmark's free-function contract (C++ class-wrapping rises from **0% in the base to 78%** here). The model improved at its trained format and regressed on unfamiliar ones, while keeping general knowledge intact.
 
 ## Intended use
 
