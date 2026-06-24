@@ -12,9 +12,12 @@
 # Usage (from $REPO_DIR):
 #   cd "$REPO_DIR"
 #   sbatch src/llm_fine_tune/evaluation/hpc/goethe/submit-benchmark.sh \
-#       <model-hf-id> [--limit N]
+#       <model-hf-id> [--limit N] [--configs c1,c2,...]
 #
-#   --limit N  cap every task at N samples (shakeout; omit for a full run)
+#   --limit N        cap every task at N samples (shakeout; omit for a full run)
+#   --configs LIST   MultiPL-E configs for the code benchmark (Phase 3); default is
+#                    humaneval-cpp,humaneval-java,humaneval-py. Add humaneval-rs,humaneval-go
+#                    for the unseen-language probe.
 #
 # Required env vars (set in ~/.bashrc):
 #   WORK_DIR  — e.g. /work/<group>/<user>
@@ -41,11 +44,27 @@ MODEL="${1:?
 shift
 
 LIMIT_FLAG=""
-if [[ "${1:-}" == "--limit" ]]; then
-    LIMIT_N="${2:?--limit requires a value}"
-    LIMIT_FLAG="--limit $LIMIT_N"
-    shift 2
-fi
+CONFIGS_FLAG=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --limit)
+            LIMIT_N="${2:?--limit requires a value}"
+            LIMIT_FLAG="--limit $LIMIT_N"
+            shift 2
+            ;;
+        --configs)
+            # Forwarded to the code-benchmark generator (Phase 3) only; e.g.
+            #   humaneval-cpp,humaneval-java,humaneval-py,humaneval-rs,humaneval-go
+            CONFIGS_FLAG="--configs ${2:?--configs requires a value}"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            echo "Usage: sbatch submit-benchmark.sh <hf-model-id> [--limit N] [--configs c1,c2,...]" >&2
+            exit 1
+            ;;
+    esac
+done
 
 : "${WORK_DIR:?WORK_DIR is not set — export WORK_DIR=/work/<group>/<user> in ~/.bashrc}"
 : "${REPO_DIR:?REPO_DIR is not set — export REPO_DIR=\$WORK_DIR/llm-fine-tune in ~/.bashrc}"
@@ -114,7 +133,8 @@ source "$REPO_DIR/.venv/bin/activate"
 python -m llm_fine_tune.evaluation.generate_code_benchmark \
     --model "$MODEL" \
     --output-dir "$RESULTS_DIR" \
-    $LIMIT_FLAG
+    $LIMIT_FLAG \
+    $CONFIGS_FLAG
 
 deactivate
 
