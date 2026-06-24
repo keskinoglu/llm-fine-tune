@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -18,17 +19,17 @@ import polars as pl
 from llm_fine_tune.execution_harness import execution
 
 
-_BRACE_LANGUAGES = {"cpp", "java"}
+_JAVA_CLASS_NAME_RE = re.compile(r"\bclass\s+(\w+)")
+_JAVA_CLASS_OPEN_RE = re.compile(r"\bclass\s+\w+[^{]*\{", re.DOTALL)
 
 
 def _function_body(completion: str) -> str:
-    """Return the body between the outermost braces of a complete function/method.
+    """Return the body between the outermost braces of a complete C++ function.
 
-    MultiPL-E's prompt opens the function signature (ends with `... {`) and its tests begin with
-    the matching `}`. The instruct-wrapped model returns a *whole* function, so for brace languages
-    we drop its signature and outer braces and slot just the body into MultiPL-E's own signature.
-    This also makes scoring robust to the model renaming the function — the tests call the name
-    MultiPL-E baked into the prompt, not whatever the model emitted.
+    MultiPL-E's C++ prompt opens the free-function signature (ends with `... {`) and its tests begin
+    with the matching `}`. The instruct-wrapped model returns a *whole* function, so we drop its
+    signature and outer braces and slot just the body into MultiPL-E's own signature — robust to the
+    model renaming the function, since the tests call the name MultiPL-E baked into the prompt.
     """
     open_i = completion.find("{")
     close_i = completion.rfind("}")
@@ -37,10 +38,56 @@ def _function_body(completion: str) -> str:
     return completion[open_i + 1 : close_i]
 
 
+def _java_method_source(completion: str) -> str:
+    """Extract the method(s) from a Java completion.
+
+    Java has no free functions, so an instruct model answers "complete this function" with either a
+    bare method or a whole `class Foo { ... }`. MultiPL-E wants the method(s) inside its own Problem
+    class, so when the model wraps them in a class we take the class body; otherwise the completion is
+    already bare. Unlike C++ we keep the full signature (a returned class nests the method, so the
+    "first { to last }" body trick would capture the signature too and duplicate it — the bug that
+    scored java ~0 for both models).
+    """
+    m = _JAVA_CLASS_OPEN_RE.search(completion)
+    if not m:
+        return completion.strip()
+    body_end = completion.rfind("}")
+    if body_end <= m.end():
+        return completion.strip()
+    return completion[m.end() : body_end].strip()
+
+
+def _java_main_block(tests: str) -> str:
+    """MultiPL-E's java tests are raw-completion shaped: a leading `}` closes the prompt's open
+    method and a trailing `}` closes its class. Strip both to leave the bare `main(...) { ... }`."""
+    t = tests.strip()
+    if t.startswith("}"):
+        t = t[1:].lstrip()
+    if t.endswith("}"):
+        t = t[:-1].rstrip()
+    return t
+
+
+def _assemble_java(prompt: str, completion: str, tests: str) -> str:
+    """Rebuild a single-class Java program: the prompt's imports + a Problem class wrapping the
+    model's method(s) and MultiPL-E's main(). Handles the model returning either a bare method or a
+    full class without duplicating the method signature."""
+    imports = "\n".join(
+        line for line in prompt.splitlines() if line.lstrip().startswith("import")
+    )
+    name_match = _JAVA_CLASS_NAME_RE.search(prompt)
+    class_name = name_match.group(1) if name_match else "Problem"
+    methods = _java_method_source(completion)
+    main = _java_main_block(tests)
+    return f"{imports}\nclass {class_name} {{\n{methods}\n{main}\n}}\n"
+
+
 def _assemble_multipl_e_program(
     completion: str, tests: str, language: str, prompt: str
 ) -> str:
-    if language in _BRACE_LANGUAGES:
+    if language == "java":
+        return _assemble_java(prompt, completion, tests)
+    if language == "cpp":
         return prompt + "\n" + _function_body(completion) + "\n" + tests
     # Python comes from canonical HumanEval: the model returns a full function that the appended
     # check(<entry_point>) harness calls by name, so use it whole under the stdlib preamble.
