@@ -206,8 +206,9 @@ forgetting.
 \* **Java is harness-confounded, not a real measure.** Java *requires* a class, so both models return a
 whole `class Problem{…}` (base 93%, ft 100%); the MultiPL-E assembler slots the model's body into the
 prompt's already-open signature, and a returned full class duplicates the signature → javac "illegal
-start of expression". Base Java at 5% is the assembler, not the model. A class-aware assembler is open
-work; Java is excluded from the headline for now.
+start of expression". Base Java at 5% is the assembler, not the model. A class-aware assembler has
+since been added (rebuilds java as a single Problem class wrapping the model's method); the corrected
+base-vs-ft Java numbers await a compute-node re-score. Java is excluded from the headline for now.
 
 ### The combined picture
 
