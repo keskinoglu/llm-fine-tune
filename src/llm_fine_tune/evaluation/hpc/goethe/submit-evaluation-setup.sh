@@ -57,8 +57,10 @@ IMAGES_DIR="$WORK_DIR/images"
 EVALUATION_IMAGE="$IMAGES_DIR/evaluation"
 mkdir -p "$IMAGES_DIR"
 
-echo "==> Building $EVALUATION_IMAGE (python:3.11-slim + g++ + openjdk-17, --sandbox) ..."
-apptainer build --sandbox \
+echo "==> Building $EVALUATION_IMAGE (python:3.11-slim + g++ + openjdk-17 + javatuples, --sandbox) ..."
+# --force: overwrite an existing sandbox so this setup is re-runnable (e.g. to pick up new
+# image deps like the javatuples jar) without a manual rm -rf first.
+apptainer build --force --sandbox \
     "$EVALUATION_IMAGE" \
     "$REPO_DIR/src/llm_fine_tune/evaluation/hpc/goethe/evaluation_image.def"
 
