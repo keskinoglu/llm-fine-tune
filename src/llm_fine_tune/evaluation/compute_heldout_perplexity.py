@@ -45,16 +45,19 @@ def _compute_perplexity(
         for row in batch:
             prompt_messages, completion = _build_messages(row)
 
-            prompt_ids = tokenizer.apply_chat_template(
-                prompt_messages,
-                add_generation_prompt=True,
-                tokenize=True,
+            # transformers 5.x apply_chat_template(tokenize=True) returns a BatchEncoding,
+            # not a flat id list, so render to text then tokenize. add_special_tokens=False
+            # because the template already emits BOS/special tokens.
+            prompt_text = tokenizer.apply_chat_template(
+                prompt_messages, add_generation_prompt=True, tokenize=False
             )
-            full_ids = tokenizer.apply_chat_template(
+            full_text = tokenizer.apply_chat_template(
                 prompt_messages + [{"role": "assistant", "content": completion}],
                 add_generation_prompt=False,
-                tokenize=True,
+                tokenize=False,
             )
+            prompt_ids = tokenizer(prompt_text, add_special_tokens=False)["input_ids"]
+            full_ids = tokenizer(full_text, add_special_tokens=False)["input_ids"]
             prompt_ids_list.append(prompt_ids)
             full_ids_list.append(full_ids)
 
