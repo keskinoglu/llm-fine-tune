@@ -22,8 +22,10 @@ package = false
 # bigcode hard-pins torch==2.0.1 and a pre-Qwen2.5 transformers. A direct dep can't override a
 # transitive `==` pin, but override-dependencies can: force torch to a version the ROCm 6.2.4
 # index actually carries, and transformers to one that knows the Qwen2.5-Coder architecture.
-# If another bigcode pin (numpy, accelerate, datasets) conflicts after this, add it here too.
-override-dependencies = ["torch>=2.6", "transformers>=4.45"]
+# datasets<3 so bigcode can still load legacy bare dataset names (e.g. "openai_humaneval");
+# datasets 3+/4+ demand "namespace/name" URIs and break bigcode's task loaders.
+# If another bigcode pin (numpy, accelerate) conflicts after this, add it here too.
+override-dependencies = ["torch>=2.6", "transformers>=4.45", "datasets<3"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-rocm" }]

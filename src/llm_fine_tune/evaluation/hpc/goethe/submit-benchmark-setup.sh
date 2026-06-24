@@ -83,10 +83,15 @@ uv sync --project "$EVAL_ENVS_DIR/lmeval"
 # --sandbox (a directory, not a .sif): proot on this cluster can't run mksquashfs
 # (nested ptrace denied), so we build a rootfs directory instead of a .sif.
 echo ""
-echo "==> Building $BIGCODE_IMAGE (Apptainer --sandbox from Docker image) ..."
-apptainer build --sandbox \
-    "$BIGCODE_IMAGE" \
-    "docker://ghcr.io/bigcode-project/evaluation-harness-multiple:latest"
+if [[ -d "$BIGCODE_IMAGE" ]]; then
+    echo "==> $BIGCODE_IMAGE already exists, skipping build."
+    echo "    (rm -rf it first to force a rebuild; re-running this script just re-syncs the envs.)"
+else
+    echo "==> Building $BIGCODE_IMAGE (Apptainer --sandbox from Docker image) ..."
+    apptainer build --sandbox \
+        "$BIGCODE_IMAGE" \
+        "docker://ghcr.io/bigcode-project/evaluation-harness-multiple:latest"
+fi
 
 echo ""
 echo "==> Benchmark setup complete!"
