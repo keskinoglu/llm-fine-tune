@@ -21,7 +21,9 @@ from llm_fine_tune.execution_harness import execution
 
 _JAVA_CLASS_NAME_RE = re.compile(r"\bclass\s+(\w+)")
 _JAVA_CLASS_OPEN_RE = re.compile(r"\bclass\s+\w+[^{]*\{", re.DOTALL)
-_GO_FUNC_OPEN_RE = re.compile(r"\bfunc\s+\w+\s*\(")
+_GO_IMPORT_BLOCK_RE = re.compile(r"import\s*\(([^)]*)\)", re.DOTALL)
+_GO_IMPORT_SINGLE_RE = re.compile(r'import\s+((?:\w+\s+)?"[^"]+")')
+_GO_PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*$", re.MULTILINE)
 
 
 def _function_body(completion: str) -> str:
@@ -83,14 +85,42 @@ def _assemble_java(prompt: str, completion: str, tests: str) -> str:
     return f"{imports}\nclass {class_name} {{\n{methods}\n{main}\n}}\n"
 
 
+def _go_import_specs(source: str) -> list[str]:
+    """Import specs (`"path"` or `alias "path"`) from a Go source's import statements."""
+    specs: list[str] = []
+    for block in _GO_IMPORT_BLOCK_RE.findall(source):
+        for line in block.splitlines():
+            line = line.strip()
+            if line and not line.startswith("//"):
+                specs.append(line)
+    specs.extend(s.strip() for s in _GO_IMPORT_SINGLE_RE.findall(source))
+    return specs
+
+
+def _go_strip_package_and_imports(source: str) -> str:
+    source = _GO_IMPORT_BLOCK_RE.sub("", source)
+    source = _GO_IMPORT_SINGLE_RE.sub("", source)
+    source = _GO_PACKAGE_RE.sub("", source)
+    return source.strip()
+
+
 def _assemble_go(prompt: str, completion: str, tests: str) -> str:
-    """Rebuild a Go test program: prompt header (package + imports + docstring) + the model's whole
-    function + the test harness. MultiPL-E's go tests use the testing framework (func TestXxx) and do
-    not supply the function's closing brace, so the model's complete function is used as-is (not
-    body-extracted). The header is everything before the prompt's own function signature."""
-    matches = list(_GO_FUNC_OPEN_RE.finditer(prompt))
-    header = prompt[: matches[-1].start()] if matches else prompt
-    return header + completion + "\n" + tests
+    """Rebuild a Go test program. Instruct models return a whole file (package + imports + func), so
+    a naive prompt+completion+tests concatenation duplicates the `package` line. Instead: take the
+    prompt's package name; merge the prompt's imports (what the test needs) with the model's (what its
+    solution needs), deduped into one block; then the model's function(s) with its package/import
+    lines stripped; then the test harness (func TestXxx)."""
+    pkg = _GO_PACKAGE_RE.search(prompt)
+    package = pkg.group(0).strip() if pkg else "package main"
+    specs: list[str] = []
+    for spec in _go_import_specs(prompt) + _go_import_specs(completion):
+        if spec not in specs:
+            specs.append(spec)
+    imports = (
+        "import (\n" + "\n".join("\t" + s for s in specs) + "\n)\n" if specs else ""
+    )
+    body = _go_strip_package_and_imports(completion)
+    return f"{package}\n\n{imports}\n{body}\n{tests}\n"
 
 
 def _assemble_multipl_e_program(

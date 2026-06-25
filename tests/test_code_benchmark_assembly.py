@@ -165,3 +165,25 @@ def test_go_assembly_is_wellformed():
         program.count(_GO_SIG) == 1
     )  # from the model's completion, prompt's open sig dropped
     assert "func TestHasCloseElements" in program
+
+
+def test_go_assembly_drops_model_package_and_merges_imports():
+    # Real model output is a whole file: its own `package` + imports + func. A naive concat duplicates
+    # `package` (the cluster bug: "expected declaration, found 'package'"). Assembly must drop the
+    # model's package and union the imports.
+    completion = (
+        "package main\n\n"
+        "import (\n"
+        '    "sort"\n'
+        ")\n\n"
+        "func has_close_elements(numbers []float64, threshold float64) bool {\n"
+        "    sort.Float64s(numbers)\n"
+        "    return false\n"
+        "}"
+    )
+    program = _assemble_multipl_e_program(completion, GO_TESTS, "go", GO_PROMPT)
+    assert _braces_balanced(program)
+    assert program.count("package ") == 1  # exactly one package declaration
+    assert program.count(_GO_SIG) == 1
+    assert '"sort"' in program  # model's import merged in
+    assert '"testing"' in program  # prompt's import preserved

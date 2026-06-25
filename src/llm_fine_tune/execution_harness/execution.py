@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import TypedDict
@@ -376,27 +377,64 @@ def _self_check_rust(source: str, tmp: Path, timeout_s: float) -> dict:
     return _run_raw(_in_container([str(binary)]), timeout_s)
 
 
+# Shared Go build cache: each row's `go test` otherwise recompiles the stdlib from a cold cache,
+# which times out under parallel scoring. Warm the common deps once, then every row reuses them.
+_GO_BUILD_CACHE = os.path.join(tempfile.gettempdir(), "llm_ft_go_build_cache")
+_go_warm_lock = threading.Lock()
+_go_cache_warmed = False
+
+
+def _go_env(tmp: Path) -> dict:
+    return {
+        **os.environ,
+        "GOCACHE": _GO_BUILD_CACHE,  # shared across rows
+        "GOPATH": str(tmp / "gopath"),
+        "HOME": str(tmp),
+        "GOPROXY": "off",  # stdlib only; never reach the network under --net none
+        "GOFLAGS": "-mod=mod",
+    }
+
+
+def _warm_go_cache() -> None:
+    """Compile the testing/fmt dependency tree into the shared cache once (locked), so the parallel
+    per-row `go test` calls all hit a warm cache and finish within the per-row timeout."""
+    global _go_cache_warmed
+    with _go_warm_lock:
+        if _go_cache_warmed:
+            return
+        os.makedirs(_GO_BUILD_CACHE, exist_ok=True)
+        with tempfile.TemporaryDirectory() as warmdir:
+            wd = Path(warmdir)
+            (wd / "warm_test.go").write_text(
+                'package m\n\nimport (\n\t"testing"\n\t"fmt"\n)\n\n'
+                "func TestWarm(t *testing.T) { fmt.Sprint(1) }\n"
+            )
+            (wd / "go.mod").write_text("module warm\n\ngo 1.19\n")
+            subprocess.run(
+                _in_container(["go", "test", "./..."]),
+                cwd=str(wd),
+                env=_go_env(wd),
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=300,
+            )
+        _go_cache_warmed = True
+
+
 def _self_check_go(source: str, tmp: Path, timeout_s: float) -> dict:
     # MultiPL-E go tests use the testing framework (func TestXxx), so we run `go test`, not a binary.
-    # A throwaway module dir + caches/HOME under tmp keep it self-contained and offline (--net none).
+    _warm_go_cache()
     pkg = tmp / "gopkg"
     pkg.mkdir(parents=True, exist_ok=True)
     (pkg / "solution_test.go").write_text(source)
     (pkg / "go.mod").write_text("module solutiontest\n\ngo 1.19\n")
-    env = {
-        **os.environ,
-        "GOCACHE": str(tmp / "gocache"),
-        "GOPATH": str(tmp / "gopath"),
-        "HOME": str(tmp),
-        "GOPROXY": "off",
-        "GOFLAGS": "-mod=mod",
-    }
     start = time.perf_counter()
     try:
         proc = subprocess.run(
             _in_container(["go", "test", "./..."]),
             cwd=str(pkg),
-            env=env,
+            env=_go_env(tmp),
             capture_output=True,
             text=True,
             errors="replace",
@@ -413,8 +451,8 @@ def _self_check_go(source: str, tmp: Path, timeout_s: float) -> dict:
     runtime_ms = (time.perf_counter() - start) * 1000
     output = (proc.stdout or "") + (proc.stderr or "")
     return {
-        # go test folds compile + run; a compile error prints "[build failed]".
-        "compiled": "[build failed]" not in output,
+        # go test folds compile + run; a compile/setup error prints "[build failed]"/"[setup failed]".
+        "compiled": "build failed]" not in output and "setup failed]" not in output,
         "passed": proc.returncode == 0,
         "returncode": proc.returncode,
         "diagnostics": output,
